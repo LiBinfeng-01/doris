@@ -55,6 +55,6 @@ public abstract class CharacterType extends PrimitiveType {
 
     @Override
     public int width() {
-        return WIDTH;
+        return getLen();
     }
 }

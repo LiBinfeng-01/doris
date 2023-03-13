@@ -119,6 +119,7 @@ public abstract class Type {
     private static final ArrayList<Type> mapSubTypes;
     private static final ArrayList<Type> structSubTypes;
     private static final ArrayList<ScalarType> trivialTypes;
+    private static long byteSize = -1;
 
     static {
         integerTypes = Lists.newArrayList();
@@ -284,6 +285,17 @@ public abstract class Type {
      */
     public boolean supportSubType(Type subType) {
         return false;
+    }
+
+    /**
+     * Set byte size of expression
+     */
+    public static void setByteSize(long byteSize) {
+        Type.byteSize = byteSize;
+    }
+
+    public static long getByteSize() {
+        return byteSize;
     }
 
     /**

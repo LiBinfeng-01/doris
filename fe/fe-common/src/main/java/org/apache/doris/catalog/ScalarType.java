@@ -646,6 +646,7 @@ public class ScalarType extends Type {
             case STRING:
             case JSONB: {
                 scalarType.setLen(len);
+                container.setByteSize(len);
                 break;
             }
             case DECIMALV2:

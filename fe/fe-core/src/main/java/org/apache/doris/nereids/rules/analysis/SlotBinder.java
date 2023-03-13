@@ -32,6 +32,8 @@ import org.apache.doris.nereids.trees.expressions.SlotReference;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
+import org.apache.doris.nereids.types.VarcharType;
+import org.apache.doris.nereids.types.coercion.CharacterType;
 
 import java.util.List;
 import java.util.Optional;
