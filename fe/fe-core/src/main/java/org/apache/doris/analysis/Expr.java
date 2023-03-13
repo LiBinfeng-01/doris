@@ -1831,6 +1831,8 @@ public abstract class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
         private int code;
 
+        private long byte_size = -1;
+
         ExprSerCode(int code) {
             this.code = code;
         }

@@ -336,7 +336,9 @@ public class ExpressionTranslator extends DefaultExpressionVisitor<Expr, PlanTra
                 "", TFunctionBinaryType.BUILTIN, true, true, nullableMode);
 
         // create catalog FunctionCallExpr without analyze again
-        return new FunctionCallExpr(catalogFunction, new FunctionParams(false, arguments));
+        FunctionCallExpr functionCallExpr = new FunctionCallExpr(catalogFunction, new FunctionParams(false, arguments));
+        functionCallExpr.getType().setBytesize(function.getByteSize());
+        return functionCallExpr;
     }
 
     @Override

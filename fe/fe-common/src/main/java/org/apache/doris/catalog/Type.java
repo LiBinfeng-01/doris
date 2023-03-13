@@ -118,6 +118,7 @@ public abstract class Type {
     private static final ArrayList<Type> mapSubTypes;
     private static final ArrayList<Type> structSubTypes;
     private static final ArrayList<ScalarType> trivialTypes;
+    private static long byte_size = -1;
 
     static {
         integerTypes = Lists.newArrayList();
@@ -275,11 +276,24 @@ public abstract class Type {
         return structSubTypes;
     }
 
+    public static long getBytesize() {return byte_size; }
+
     /**
      * Return true if this is complex type and support subType
      */
     public boolean supportSubType(Type subType) {
         return false;
+    }
+
+    /**
+     * Set byte size of expression
+     */
+    public static void setBytesize(long byte_size) {
+        Type.byte_size = byte_size;
+    }
+
+    public static long getByte_size() {
+        return byte_size;
     }
 
     /**
@@ -548,6 +562,7 @@ public abstract class Type {
     public TTypeDesc toThrift() {
         TTypeDesc container = new TTypeDesc();
         container.setTypes(new ArrayList<TTypeNode>());
+        container.setByteSize(byte_size);
         toThrift(container);
         return container;
     }

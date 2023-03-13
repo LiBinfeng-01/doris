@@ -20,6 +20,7 @@ package org.apache.doris.nereids.rules.analysis;
 import org.apache.doris.analysis.ArithmeticExpr.Operator;
 import org.apache.doris.catalog.FunctionRegistry;
 import org.apache.doris.catalog.PrimitiveType;
+import org.apache.doris.catalog.ScalarFunction;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.analyzer.UnboundFunction;
 import org.apache.doris.nereids.exceptions.AnalysisException;
@@ -40,7 +41,9 @@ import org.apache.doris.nereids.trees.expressions.functions.BoundFunction;
 import org.apache.doris.nereids.trees.expressions.functions.FunctionBuilder;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.JsonArray;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.JsonObject;
+import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.Literal;
+import org.apache.doris.nereids.trees.expressions.literal.TinyIntLiteral;
 import org.apache.doris.nereids.trees.expressions.typecoercion.ImplicitCastInputTypes;
 import org.apache.doris.nereids.trees.expressions.visitor.DefaultExpressionRewriter;
 import org.apache.doris.nereids.types.BigIntType;
@@ -115,7 +118,11 @@ class FunctionBinder extends DefaultExpressionRewriter<CascadesContext> {
         }
 
         // type coercion
-        return visitImplicitCastInputTypes(boundFunction, boundFunction.expectedInputTypes());
+        Expression expression = visitImplicitCastInputTypes(boundFunction, boundFunction.expectedInputTypes());
+        if (((BoundFunction)expression).getName().toUpperCase().equals("SUBSTRING") && expression.getArguments().get(1) instanceof IntegerLiteral) {
+            ((BoundFunction)expression).setByteSize(((IntegerLiteral)expression.getArguments().get(1)).getValue().longValue());
+        }
+        return expression;
     }
 
     /**
