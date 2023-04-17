@@ -20,6 +20,7 @@ package org.apache.doris.nereids;
 import org.apache.doris.analysis.DescriptorTable;
 import org.apache.doris.analysis.ExplainOptions;
 import org.apache.doris.analysis.StatementBase;
+import org.apache.doris.catalog.Table;
 import org.apache.doris.common.NereidsException;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext.Lock;
@@ -36,6 +37,7 @@ import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.memo.Memo;
 import org.apache.doris.nereids.metrics.event.CounterEvent;
+import org.apache.doris.nereids.minidump.MinidumpUtils;
 import org.apache.doris.nereids.processor.post.PlanPostProcessors;
 import org.apache.doris.nereids.processor.pre.PlanPreprocessors;
 import org.apache.doris.nereids.properties.PhysicalProperties;
@@ -61,7 +63,12 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
+import java.io.DataOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -103,8 +110,10 @@ public class NereidsPlanner extends Planner {
         ExplainLevel explainLevel = getExplainLevel(queryStmt.getExplainOptions());
 
         LogicalPlan parsedPlan = logicalPlanAdapter.getLogicalPlan();
+        setParsedPlan(parsedPlan);
         PhysicalProperties requireProperties = buildInitRequireProperties(parsedPlan);
         Plan resultPlan = plan(parsedPlan, requireProperties, explainLevel);
+        setOptimizedPlan(resultPlan);
         if (explainLevel.isPlanLevel) {
             return;
         }
@@ -232,10 +241,45 @@ public class NereidsPlanner extends Planner {
                     || explainLevel == ExplainLevel.SHAPE_PLAN) {
                 optimizedPlan = physicalPlan;
             }
+            if (ConnectContext.get().getSessionVariable().isDumpNereids()) {
+                // todo: use session id and query id to generate file name
+                // todo: get right path when doing ut
+                String path = "/Users/libinfeng/workspace/doris/fe/fe-core/src/main/java/org/apache/doris/"
+                        + "nereids/minidump/data/";
+                String fileName = MinidumpUtils.generateMinidumpFileName("dumpDemo");
+                String filePath = path + fileName;
+
+                // Create a JSON object
+                JSONObject jsonObj = new JSONObject();
+                jsonObj.put("SessionVariable", ConnectContext.get().getSessionVariable().toJson());
+                JSONArray tablesJson = new JSONArray();
+                for (Table table : cascadesContext.getTables()) {
+                    tablesJson.put(table.getName());
+                    DataOutputStream dos = new DataOutputStream(new FileOutputStream(path + "/" + table.getName()));
+                    table.write(dos);
+                    dos.flush();
+                    dos.close();
+                }
+
+                jsonObj.put("Tables", tablesJson);
+                jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
+                jsonObj.put("ParsedPlan", plan.toJson());
+                jsonObj.put("ResultPlan", physicalPlan.toJson());
+
+                // Write the JSON object to a string
+                String jsonString = jsonObj.toString();
+                try (FileWriter file = new FileWriter(filePath)) {
+                    file.write(jsonString);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             timeoutExecutor.ifPresent(ExecutorService::shutdown);
 
             return physicalPlan;
+        } catch (IOException | IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -245,6 +289,9 @@ public class NereidsPlanner extends Planner {
 
     private void initCascadesContext(LogicalPlan plan, PhysicalProperties requireProperties) {
         cascadesContext = CascadesContext.newRewriteContext(statementContext, plan, requireProperties);
+        if (statementContext.getConnectContext().getTables() != null) {
+            cascadesContext.setTables(statementContext.getConnectContext().getTables());
+        }
     }
 
     private void analyze() {
@@ -431,6 +478,16 @@ public class NereidsPlanner extends Planner {
     @VisibleForTesting
     public Plan getParsedPlan() {
         return parsedPlan;
+    }
+
+    @VisibleForTesting
+    public void setParsedPlan(Plan parsedPlan) {
+        this.parsedPlan = parsedPlan;
+    }
+
+    @VisibleForTesting
+    public void setOptimizedPlan(Plan optimizedPlan) {
+        this.optimizedPlan = optimizedPlan;
     }
 
     @VisibleForTesting

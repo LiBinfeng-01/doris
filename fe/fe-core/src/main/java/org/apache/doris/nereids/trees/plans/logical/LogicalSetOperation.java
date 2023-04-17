@@ -37,6 +37,8 @@ import org.apache.doris.nereids.util.Utils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -226,4 +228,16 @@ public abstract class LogicalSetOperation extends AbstractLogicalPlan implements
     }
 
     public abstract LogicalSetOperation withNewChildren(List<Plan> children);
+
+    @Override
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        JSONArray childrenJson = new JSONArray();
+        for (Plan child : children) {
+            childrenJson.put(child.toJson());
+        }
+        json.put("children", childrenJson);
+        return json;
+    }
 }

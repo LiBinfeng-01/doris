@@ -20,6 +20,7 @@ package org.apache.doris.qe;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.Table;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.telemetry.Telemetry;
@@ -171,6 +172,12 @@ public class ConnectContext {
     private StatementContext statementContext;
     private Map<String, PrepareStmtContext> preparedStmtCtxs = Maps.newHashMap();
 
+    private List<Table> tables = null;
+
+    public void setSessionVariable(SessionVariable sessionVariable) {
+        this.sessionVariable = sessionVariable;
+    }
+
     public SessionContext getSessionContext() {
         return sessionContext;
     }
@@ -255,6 +262,14 @@ public class ConnectContext {
 
     public PrepareStmtContext getPreparedStmt(String stmtName) {
         return this.preparedStmtCtxs.get(stmtName);
+    }
+
+    public List<Table> getTables() {
+        return tables;
+    }
+
+    public void setTables(List<Table> tables) {
+        this.tables = tables;
     }
 
     public void closeTxn() {

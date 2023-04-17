@@ -29,6 +29,7 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import org.json.JSONObject;
 
 import java.util.List;
 import java.util.Optional;
@@ -89,6 +90,16 @@ public interface Plan extends TreeNode<Plan> {
     List<Slot> getOutput();
 
     List<Slot> getNonUserVisibleOutput();
+
+    default JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        return json;
+    }
+
+    default Plan readFromJson(JSONObject jsonObject) {
+        return withLogicalProperties(null);
+    }
 
     /**
      * Get output slot set of the plan.
