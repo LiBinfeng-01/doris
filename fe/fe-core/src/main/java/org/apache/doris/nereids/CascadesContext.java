@@ -336,6 +336,17 @@ public class CascadesContext implements ScheduleContext, PlanSource {
         }
     }
 
+    /** get table by table name, try to get from information from dumpfile first */
+    public Table getTableByName(String tableName) {
+        assert (tables != null);
+        for (Table table : tables) {
+            if (table.getName().equals(tableName)) {
+                return table;
+            }
+        }
+        return null;
+    }
+
     public List<Table> getTables() {
         return tables;
     }

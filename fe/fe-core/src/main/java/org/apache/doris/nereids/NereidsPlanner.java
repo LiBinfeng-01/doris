@@ -20,7 +20,7 @@ package org.apache.doris.nereids;
 import org.apache.doris.analysis.DescriptorTable;
 import org.apache.doris.analysis.ExplainOptions;
 import org.apache.doris.analysis.StatementBase;
-import org.apache.doris.catalog.Table;
+import org.apache.doris.catalog.Env;
 import org.apache.doris.common.NereidsException;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext.Lock;
@@ -53,7 +53,6 @@ import org.apache.doris.planner.PlanFragment;
 import org.apache.doris.planner.Planner;
 import org.apache.doris.planner.RuntimeFilter;
 import org.apache.doris.planner.ScanNode;
-import org.apache.doris.qe.ConnectContext;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -66,8 +65,8 @@ import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.DataOutputStream;
-import java.io.FileOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -121,8 +120,11 @@ public class NereidsPlanner extends Planner {
         PlanTranslatorContext planTranslatorContext = new PlanTranslatorContext(cascadesContext);
         PhysicalPlanTranslator physicalPlanTranslator = new PhysicalPlanTranslator(planTranslatorContext,
                 statementContext.getConnectContext().getStatsErrorEstimator());
-        if (ConnectContext.get().getSessionVariable().isEnableNereidsTrace()) {
+        if (cascadesContext.getConnectContext().getSessionVariable().isEnableNereidsTrace()) {
             CounterEvent.clearCounter();
+        }
+        if (cascadesContext.getConnectContext().getSessionVariable().isPlayNereidsDump()) {
+            return;
         }
         PlanFragment root = physicalPlanTranslator.translatePlan(physicalPlan);
 
@@ -222,17 +224,17 @@ public class NereidsPlanner extends Planner {
 
             // print memo before choose plan.
             // if chooseNthPlan failed, we could get memo to debug
-            if (ConnectContext.get().getSessionVariable().isDumpNereidsMemo()) {
+            if (cascadesContext.getConnectContext().getSessionVariable().isDumpNereidsMemo()) {
                 String memo = cascadesContext.getMemo().toString();
                 LOG.info(memo);
             }
 
-            int nth = ConnectContext.get().getSessionVariable().getNthOptimizedPlan();
+            int nth = cascadesContext.getConnectContext().getSessionVariable().getNthOptimizedPlan();
             PhysicalPlan physicalPlan = chooseNthPlan(getRoot(), requireProperties, nth);
 
             physicalPlan = postProcess(physicalPlan);
 
-            if (ConnectContext.get().getSessionVariable().isDumpNereidsMemo()) {
+            if (cascadesContext.getConnectContext().getSessionVariable().isDumpNereidsMemo()) {
                 String tree = physicalPlan.treeString();
                 LOG.info(tree);
             }
@@ -241,45 +243,20 @@ public class NereidsPlanner extends Planner {
                     || explainLevel == ExplainLevel.SHAPE_PLAN) {
                 optimizedPlan = physicalPlan;
             }
-            if (ConnectContext.get().getSessionVariable().isDumpNereids()) {
-                // todo: use session id and query id to generate file name
-                // todo: get right path when doing ut
-                String path = "/Users/libinfeng/workspace/doris/fe/fe-core/src/main/java/org/apache/doris/"
-                        + "nereids/minidump/data/";
-                String fileName = MinidumpUtils.generateMinidumpFileName("dumpDemo");
-                String filePath = path + fileName;
-
-                // Create a JSON object
-                JSONObject jsonObj = new JSONObject();
-                jsonObj.put("SessionVariable", ConnectContext.get().getSessionVariable().toJson());
-                JSONArray tablesJson = new JSONArray();
-                for (Table table : cascadesContext.getTables()) {
-                    tablesJson.put(table.getName());
-                    DataOutputStream dos = new DataOutputStream(new FileOutputStream(path + "/" + table.getName()));
-                    table.write(dos);
-                    dos.flush();
-                    dos.close();
-                }
-
-                jsonObj.put("Tables", tablesJson);
-                jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
-                jsonObj.put("ParsedPlan", plan.toJson());
-                jsonObj.put("ResultPlan", physicalPlan.toJson());
-
-                // Write the JSON object to a string
-                String jsonString = jsonObj.toString();
-                try (FileWriter file = new FileWriter(filePath)) {
-                    file.write(jsonString);
+            if (cascadesContext.getConnectContext().getSessionVariable().isDumpNereids()) {
+                try {
+                    MinidumpUtils.init();
+                    String queryId = (cascadesContext.getConnectContext().queryId() == null)
+                            ? "dumpDemo" : cascadesContext.getConnectContext().queryId().toString();
+                    serializeToDumpFile(plan, physicalPlan, queryId);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    throw new RuntimeException(e);
                 }
             }
 
             timeoutExecutor.ifPresent(ExecutorService::shutdown);
 
             return physicalPlan;
-        } catch (IOException | IOException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -347,6 +324,46 @@ public class NereidsPlanner extends Planner {
 
     private PhysicalPlan postProcess(PhysicalPlan physicalPlan) {
         return new PlanPostProcessors(cascadesContext).process(physicalPlan);
+    }
+
+    private void serializeToDumpFile(Plan parsedPlan, Plan optimizedPlan, String dumpName) throws IOException {
+        String dumpPath = MinidumpUtils.DUMP_PATH + "/" + dumpName;
+        File minidumpFileDir = new File(dumpPath);
+        if (!minidumpFileDir.exists()) {
+            minidumpFileDir.mkdirs();
+        }
+        // Create a JSON object
+        JSONObject jsonObj = new JSONObject();
+        // add session variable
+        jsonObj.put("SessionVariable", cascadesContext.getConnectContext().getSessionVariable().toJson());
+        // add tables
+        String dbAndCatalogName = "/" + cascadesContext.getConnectContext().getDatabase() + "-"
+                + cascadesContext.getConnectContext().getCurrentCatalog().getName() + "-";
+        jsonObj.put("CatalogName", cascadesContext.getConnectContext().getCurrentCatalog().getName());
+        jsonObj.put("DbName", cascadesContext.getConnectContext().getDatabase());
+        JSONArray tablesJson = MinidumpUtils.serializeTables(dumpPath, dbAndCatalogName, cascadesContext.getTables());
+        jsonObj.put("Tables", tablesJson);
+        // add colocate table index, used to indicate grouping of table distribution
+        String colocateTableIndexPath = dumpPath + "/ColocateTableIndex";
+        MinidumpUtils.serializeColocateTableIndex(colocateTableIndexPath, Env.getCurrentColocateIndex());
+        jsonObj.put("ColocateTableIndex", "/ColocateTableIndex");
+        // add column statistics
+        JSONArray columnStatistics = MinidumpUtils.serializeColumnStatistic(
+                cascadesContext.getConnectContext().getTotalColumnStatisticMap());
+        jsonObj.put("ColumnStatistics", columnStatistics);
+        // todo: add histogram serialize
+        // add original sql, parsed plan and optimized plan
+        jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
+        jsonObj.put("ParsedPlan", parsedPlan.toJson());
+        jsonObj.put("ResultPlan", optimizedPlan.toJson());
+
+        // Write the JSON object to a string and put it into file
+        String jsonString = jsonObj.toString();
+        try (FileWriter file = new FileWriter(dumpPath + "/" + "dumpFile.json")) {
+            file.write(jsonString);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override

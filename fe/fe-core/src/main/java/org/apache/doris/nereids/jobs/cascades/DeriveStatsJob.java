@@ -88,9 +88,15 @@ public class DeriveStatsJob extends Job {
                 }
             }
         } else {
-            StatsCalculator.estimate(groupExpression);
+            StatsCalculator statsCalculator = StatsCalculator.estimate(groupExpression,
+                    context.getCascadesContext().getConnectContext().getSessionVariable().getForbidUnknownColStats(),
+                    context.getCascadesContext().getConnectContext().getTotalColumnStatisticMap());
             STATS_STATE_TRACER.log(StatsStateEvent.of(groupExpression,
                     groupExpression.getOwnerGroup().getStatistics()));
+            context.getCascadesContext().getConnectContext().getTotalColumnStatisticMap()
+                    .putAll(statsCalculator.getTotalColumnStatisticMap());
+            context.getCascadesContext().getConnectContext().getTotalHistogramMap()
+                    .putAll(statsCalculator.getTotalHistogramMap());
         }
     }
 }

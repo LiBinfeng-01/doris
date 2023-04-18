@@ -293,6 +293,8 @@ public class SessionVariable implements Serializable, Writable {
 
     public static final String DUMP_NEREIDS = "dump_nereids";
 
+    public static final String PLAN_NEREIDS_DUMP = "plan_nereids_dump";
+
     public static final String DUMP_NEREIDS_MEMO = "dump_nereids_memo";
 
     // fix replica to query. If num = 1, query the smallest replica, if 2 is the second smallest replica.
@@ -800,6 +802,9 @@ public class SessionVariable implements Serializable, Writable {
 
     @VariableMgr.VarAttr(name = DUMP_NEREIDS)
     public boolean dumpNereids = false;
+
+    @VariableMgr.VarAttr(name = PLAN_NEREIDS_DUMP)
+    public boolean planNereidsDump = false;
 
     // If set to true, all query will be executed without returning result
     @VariableMgr.VarAttr(name = DRY_RUN_QUERY, needForward = true)
@@ -1921,6 +1926,14 @@ public class SessionVariable implements Serializable, Writable {
 
     public void setDumpNereids(boolean dumpNereids) {
         this.dumpNereids = dumpNereids;
+    }
+
+    public boolean isPlayNereidsDump() {
+        return planNereidsDump;
+    }
+
+    public void setPlanNereidsDump(boolean planNereidsDump) {
+        this.planNereidsDump = planNereidsDump;
     }
 
     public boolean isDumpNereidsMemo() {

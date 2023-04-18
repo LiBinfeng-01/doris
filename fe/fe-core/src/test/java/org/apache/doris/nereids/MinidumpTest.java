@@ -30,13 +30,14 @@ import org.apache.doris.utframe.TestWithFeService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 class MinidumpTest extends TestWithFeService implements MemoPatternMatchSupported {
 
-    private String path = "/Users/libinfeng/workspace/doris/fe/fe-core/src/main/java/org/apache/doris/nereids/minidump/data/";
+    private String path = "/Users/libinfeng/workspace/doris/fe/log/minidump/dumpDemo";
 
     @Override
     protected void runBeforeAll() throws Exception {
@@ -99,15 +100,19 @@ class MinidumpTest extends TestWithFeService implements MemoPatternMatchSupporte
 
     @Test
     public void testLoadMinidump() {
-        String fileName = MinidumpUtils.generateMinidumpFileName("dumpDemo");
-        String filePath = path + fileName;
-        Minidump minidump = MinidumpUtils.jsonMinidumpLoad(path, filePath);
+        Minidump minidump = null;
+        try {
+            minidump = MinidumpUtils.jsonMinidumpLoad(path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         connectContext.setSessionVariable(minidump.getSessionVariable());
         connectContext.setTables(minidump.getTables());
         connectContext.getSessionVariable().setDumpNereids(false);
+        Minidump finalMinidump = minidump;
         PlanChecker.from(connectContext).checkPlannerResult(
                 minidump.getSql(),
-                planner -> checkMinidumpResult(planner, minidump)
+                planner -> checkMinidumpResult(planner, finalMinidump)
         );
     }
 
