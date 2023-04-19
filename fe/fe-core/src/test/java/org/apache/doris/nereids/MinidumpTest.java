@@ -119,6 +119,8 @@ class MinidumpTest extends TestWithFeService implements MemoPatternMatchSupporte
     @Test
     public void testSaveMinidump() {
         connectContext.getSessionVariable().setDumpNereids(true);
+        connectContext.getSessionVariable().setEnableNereidsTimeout(false);
+        connectContext.getSessionVariable().setNereidsTraceEventMode("all");
         PlanChecker.from(connectContext).checkPlannerResult(
                 "select * from t1 join [shuffle] t2 on t1.a=t2.x",
                 planner -> checkPlannerResult(planner, DistributionMode.PARTITIONED)

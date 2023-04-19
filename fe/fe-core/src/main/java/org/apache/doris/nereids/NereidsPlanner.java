@@ -36,6 +36,7 @@ import org.apache.doris.nereids.memo.CopyInResult;
 import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.memo.Memo;
+import org.apache.doris.nereids.metrics.EventChannel;
 import org.apache.doris.nereids.metrics.event.CounterEvent;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
 import org.apache.doris.nereids.processor.post.PlanPostProcessors;
@@ -60,6 +61,7 @@ import com.google.common.collect.Lists;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
@@ -203,7 +205,7 @@ public class NereidsPlanner extends Planner {
             }
 
             Optional<ScheduledExecutorService> timeoutExecutor = Optional.empty();
-            if (ConnectContext.get().getSessionVariable().enableNereidsTimeout) {
+            if (cascadesContext.getConnectContext().getSessionVariable().enableNereidsTimeout) {
                 timeoutExecutor = Optional.of(runTimeoutExecutor());
             }
 
@@ -356,6 +358,8 @@ public class NereidsPlanner extends Planner {
         jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
         jsonObj.put("ParsedPlan", parsedPlan.toJson());
         jsonObj.put("ResultPlan", optimizedPlan.toJson());
+        EventChannel.getDefaultChannel().run();
+//        jsonObj.put("EventChannel", EventChannel.getDefaultChannel().toString());
 
         // Write the JSON object to a string and put it into file
         String jsonString = jsonObj.toString();

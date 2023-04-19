@@ -910,6 +910,10 @@ public class SessionVariable implements Serializable, Writable {
         this.enableNereidsTrace = enableNereidsTrace;
     }
 
+    public void setEnableNereidsTimeout(boolean enableNereidsTimeout) {
+        this.enableNereidsTimeout = enableNereidsTimeout;
+    }
+
     public void setNereidsTraceEventMode(String nereidsTraceEventMode) {
         checkNereidsTraceEventMode(nereidsTraceEventMode);
         this.nereidsTraceEventMode = nereidsTraceEventMode;

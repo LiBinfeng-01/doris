@@ -22,11 +22,15 @@ import org.apache.doris.nereids.metrics.EventConsumer;
 
 import org.apache.logging.log4j.Logger;
 
+import java.io.*;
+
 /**
  * log consumer
  */
 public class LogConsumer extends EventConsumer {
     private final Logger logger;
+
+    private final String logFile = "/Users/libinfeng/workspace/doris/fe/log/minidump/dumpDemo/metriclog";
 
     public LogConsumer(Class<? extends Event> targetClass, Logger logger) {
         super(targetClass);
@@ -35,6 +39,13 @@ public class LogConsumer extends EventConsumer {
 
     @Override
     public void consume(Event e) {
-        logger.info(e.toString());
+        try {
+            FileWriter fileWriter = new FileWriter(logFile, true);
+            fileWriter.write(e.toString());
+            fileWriter.close();
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+//        logger.info(e.toString());
     }
 }

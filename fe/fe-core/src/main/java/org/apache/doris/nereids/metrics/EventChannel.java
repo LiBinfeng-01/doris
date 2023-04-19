@@ -90,6 +90,27 @@ public class EventChannel {
         }
     }
 
+    public void run() {
+        while (!isStop.get() && !queue.isEmpty()) {
+            try {
+                Event e = queue.take();
+                for (EventConsumer consumer : consumers.get(e.getClass())) {
+                    if (enhancers.containsKey(e.getClass())) {
+                        enhancers.get(e.getClass()).enhance(e);
+                    }
+                    consumer.consume(e);
+                }
+            } catch (Exception exception) {
+                LOG.warn("encounter exception when push event: ", exception);
+            }
+        }
+        for (List<EventConsumer> consumerList : consumers.values()) {
+            for (EventConsumer consumer : consumerList) {
+                consumer.close();
+            }
+        }
+    }
+
     /**
      * worker thread start.
      */
