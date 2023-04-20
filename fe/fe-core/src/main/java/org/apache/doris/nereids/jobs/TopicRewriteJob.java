@@ -18,6 +18,10 @@
 package org.apache.doris.nereids.jobs;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.doris.nereids.metrics.EventChannel;
+import org.apache.doris.nereids.metrics.EventProducer;
+import org.apache.doris.nereids.metrics.consumer.LogConsumer;
+import org.apache.doris.nereids.metrics.event.TransformEvent;
 
 import java.util.List;
 import java.util.stream.Stream;

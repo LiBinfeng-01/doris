@@ -1,4 +1,4 @@
-// Licensed to the Apache Software Foundation (ASF) under one
+package org.apache.doris.nereids.minidump;// Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
 // regarding copyright ownership.  The ASF licenses this file
@@ -15,25 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.nereids.metrics.consumer;
-
+import com.alibaba.fastjson2.JSON;
 import org.apache.doris.common.util.TimeUtils;
-import org.apache.doris.nereids.metrics.Event;
-import org.apache.doris.nereids.metrics.EventConsumer;
-
-import org.apache.logging.log4j.Logger;
+import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.rules.RuleType;
+import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.qe.SessionVariable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.*;
 import java.sql.Time;
+import java.util.List;
 
 /**
  * log consumer
  */
-public class LogConsumer extends EventConsumer {
-    private final Logger logger;
-
+public class NereidsTracer {
     private static long startTime;
 
     private static final String logFile = "/Users/libinfeng/workspace/doris/fe/log/minidump/dumpDemo/metriclog";
@@ -42,18 +40,26 @@ public class LogConsumer extends EventConsumer {
 
     private static JSONArray enforcerEvent = new JSONArray();
 
+    private static JSONArray rewriteEvent = new JSONArray();
+
     private static JSONArray costStateUpdateEvent = new JSONArray();
 
     private static JSONArray transformEvent = new JSONArray();
 
+    private static JSONArray importantTime = new JSONArray();
+
     public static void setStartTime(long startTime) {
-        LogConsumer.startTime = startTime;
+        NereidsTracer.startTime = startTime;
     }
 
     public static String getCurrentTime() {
-//        return TimeUtils.getCurrentFormatMsTime();
-        return String.valueOf(TimeUtils.getEstimatedTime(LogConsumer.startTime)/1000) + "us";
-//        return TimeUtils.longToTimeStringWithms(TimeUtils.getEstimatedTime(LogConsumer.startTime));
+        return String.valueOf(TimeUtils.getEstimatedTime(NereidsTracer.startTime)/1000) + "us";
+    }
+
+    public static void logRewriteEvent(String rewriteMsg) {
+        JSONObject rewriteEventJson = new JSONObject();
+        rewriteEventJson.put(getCurrentTime(), rewriteMsg);
+        rewriteEvent.put(rewriteEventJson);
     }
 
     public static JSONArray getEnforcerEvent() {
@@ -68,24 +74,16 @@ public class LogConsumer extends EventConsumer {
         return transformEvent;
     }
 
-    public LogConsumer(Class<? extends Event> targetClass, Logger logger) {
-        super(targetClass);
-        this.logger = logger;
+    public static void logImportantTime(String eventDesc) {
+        JSONObject timeEvent = new JSONObject();
+        timeEvent.put(getCurrentTime(), eventDesc);
+        importantTime.put(timeEvent);
     }
 
-    @Override
-    public void consume(Event e) {
-        return;
-//        JSONArray jsonArray = totalTraces.getJSONArray(e.getClass().toString());
-//        if (jsonArray == null) {
-//            jsonArray = new JSONArray();
-//            totalTraces.put(e.getClass().toString(), jsonArray);
-//        }
-//        jsonArray.put(e.toJson().toString());
-    }
-
-    public static void output()
+    public static void output(SessionVariable sessionVariable)
     {
+        totalTraces.put("ImportantTime", importantTime);
+        totalTraces.put("RewriteEvent", rewriteEvent);
         totalTraces.put("TransformEvent", transformEvent);
         totalTraces.put("CostStateUpdateEvent", costStateUpdateEvent);
         totalTraces.put("EnforcerEvent", enforcerEvent);
@@ -98,3 +96,4 @@ public class LogConsumer extends EventConsumer {
         }
     }
 }
+

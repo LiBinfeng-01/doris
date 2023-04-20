@@ -18,6 +18,7 @@
 package org.apache.doris.nereids.jobs.batch;
 
 import org.apache.doris.nereids.CascadesContext;
+import org.apache.doris.nereids.jobs.Job;
 import org.apache.doris.nereids.jobs.JobContext;
 import org.apache.doris.nereids.jobs.RewriteJob;
 import org.apache.doris.nereids.jobs.TopicRewriteJob;
@@ -25,6 +26,8 @@ import org.apache.doris.nereids.jobs.rewrite.CustomRewriteJob;
 import org.apache.doris.nereids.jobs.rewrite.PlanTreeRewriteBottomUpJob;
 import org.apache.doris.nereids.jobs.rewrite.PlanTreeRewriteTopDownJob;
 import org.apache.doris.nereids.jobs.rewrite.RootPlanTreeRewriteJob;
+import org.apache.doris.nereids.metrics.event.TransformEvent;
+import org.apache.doris.nereids.minidump.NereidsTracer;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleFactory;
 import org.apache.doris.nereids.rules.RuleType;
@@ -38,6 +41,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import static org.apache.doris.nereids.jobs.Job.REWRITE_RULE_TRACER;
 
 /**
  * Base class for executing all jobs.
@@ -108,6 +113,7 @@ public abstract class BatchRewriteJob {
             do {
                 jobContext.setRewritten(false);
                 job.execute(jobContext);
+                NereidsTracer.logRewriteEvent(job.getClass().toString());
             } while (!job.isOnce() && jobContext.isRewritten());
         }
     }

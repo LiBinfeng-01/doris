@@ -17,11 +17,16 @@
 
 package org.apache.doris.nereids.metrics.event;
 
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.metrics.Event;
+import org.apache.doris.nereids.metrics.consumer.LogConsumer;
 import org.apache.doris.nereids.rules.RuleType;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Log;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.util.Utils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.List;
 
@@ -43,8 +48,11 @@ public class TransformEvent extends Event {
 
     public static TransformEvent of(GroupExpression groupExpression, Plan before, List<Plan> afters,
             RuleType ruleType) {
-        return checkConnectContext(TransformEvent.class)
-                ? new TransformEvent(groupExpression, before, afters, ruleType) : null;
+        TransformEvent thisEvent = new TransformEvent(groupExpression, before, afters, ruleType);
+        JSONObject eventJson = new JSONObject();
+        eventJson.put(LogConsumer.getCurrentTime(), thisEvent.toJson());
+        LogConsumer.getTransformEvent().put(eventJson);
+        return null;
     }
 
     public GroupExpression getGroupExpression() {
@@ -55,5 +63,17 @@ public class TransformEvent extends Event {
     public String toString() {
         return Utils.toSqlString("TransformEvent", "groupExpression", groupExpression,
                 "before", before, "afters", afters, "ruleType", ruleType);
+    }
+
+    public JSONObject toJson() {
+        JSONObject jsonObj = new JSONObject();
+        jsonObj.put("TransformRule", ruleType.toString());
+        jsonObj.put("Before", before.toJson());
+        JSONArray afterPlans = new JSONArray();
+        for (Plan afterPlan : afters) {
+            afterPlans.put(afterPlan.toJson());
+        }
+        jsonObj.put("Afters", afterPlans);
+        return jsonObj;
     }
 }

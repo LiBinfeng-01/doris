@@ -293,6 +293,8 @@ public class SessionVariable implements Serializable, Writable {
 
     public static final String DUMP_NEREIDS = "dump_nereids";
 
+    public static final String TRACE_NEREIDS = "trace_nereids";
+
     public static final String PLAN_NEREIDS_DUMP = "plan_nereids_dump";
 
     public static final String DUMP_NEREIDS_MEMO = "dump_nereids_memo";
@@ -802,6 +804,9 @@ public class SessionVariable implements Serializable, Writable {
 
     @VariableMgr.VarAttr(name = DUMP_NEREIDS)
     public boolean dumpNereids = false;
+
+    @VariableMgr.VarAttr(name = TRACE_NEREIDS)
+    public boolean traceNereids = false;
 
     @VariableMgr.VarAttr(name = PLAN_NEREIDS_DUMP)
     public boolean planNereidsDump = false;
@@ -1930,6 +1935,14 @@ public class SessionVariable implements Serializable, Writable {
 
     public void setDumpNereids(boolean dumpNereids) {
         this.dumpNereids = dumpNereids;
+    }
+
+    public boolean isTraceNereids() {
+        return traceNereids;
+    }
+
+    public void setTraceNereids(boolean traceNereids) {
+        this.traceNereids = traceNereids;
     }
 
     public boolean isPlayNereidsDump() {

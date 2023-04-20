@@ -19,6 +19,7 @@ package org.apache.doris.nereids.metrics;
 
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.qe.ConnectContext;
+import org.json.JSONObject;
 
 /**
  * event
@@ -40,13 +41,15 @@ public abstract class Event implements Cloneable {
                 && ConnectContext.get().getSessionVariable().getParsedNereidsEventMode().contains(targetClass);
     }
 
-    public final String toJson() {
-        return Utils.toSqlString("Event", "StateId", stateId);
+    public JSONObject toJson() {
+        JSONObject jsonObj = new JSONObject();
+        jsonObj.put("StateId", stateId);
+        return jsonObj;
     }
 
     @Override
     public String toString() {
-        return toJson();
+        return toJson().toString();
     }
 
     @Override

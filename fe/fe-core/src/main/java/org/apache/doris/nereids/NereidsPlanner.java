@@ -23,6 +23,7 @@ import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.NereidsException;
 import org.apache.doris.common.Pair;
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.CascadesContext.Lock;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.glue.LogicalPlanAdapter;
@@ -37,8 +38,10 @@ import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.memo.Memo;
 import org.apache.doris.nereids.metrics.EventChannel;
+import org.apache.doris.nereids.metrics.consumer.LogConsumer;
 import org.apache.doris.nereids.metrics.event.CounterEvent;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
+import org.apache.doris.nereids.minidump.NereidsTracer;
 import org.apache.doris.nereids.processor.post.PlanPostProcessors;
 import org.apache.doris.nereids.processor.pre.PlanPreprocessors;
 import org.apache.doris.nereids.properties.PhysicalProperties;
@@ -102,6 +105,9 @@ public class NereidsPlanner extends Planner {
 
     @Override
     public void plan(StatementBase queryStmt, org.apache.doris.thrift.TQueryOptions queryOptions) {
+        if (statementContext.getConnectContext().getSessionVariable().isEnableNereidsTrace()) {
+            NereidsTracer.setStartTime(TimeUtils.getStartTime());
+        }
         if (!(queryStmt instanceof LogicalPlanAdapter)) {
             throw new RuntimeException("Wrong type of queryStmt, expected: <? extends LogicalPlanAdapter>");
         }
@@ -111,6 +117,7 @@ public class NereidsPlanner extends Planner {
         ExplainLevel explainLevel = getExplainLevel(queryStmt.getExplainOptions());
 
         LogicalPlan parsedPlan = logicalPlanAdapter.getLogicalPlan();
+        NereidsTracer.logImportantTime("EndParsePlan");
         setParsedPlan(parsedPlan);
         PhysicalProperties requireProperties = buildInitRequireProperties(parsedPlan);
         Plan resultPlan = plan(parsedPlan, requireProperties, explainLevel);
@@ -186,6 +193,7 @@ public class NereidsPlanner extends Planner {
             try (Scope scope = queryAnalysisSpan.makeCurrent()) {
                 // analyze this query
                 analyze();
+                NereidsTracer.logImportantTime("EndAnalyzePlan");
             } catch (Exception e) {
                 queryAnalysisSpan.recordException(e);
                 throw e;
@@ -211,6 +219,7 @@ public class NereidsPlanner extends Planner {
 
             // rule-based optimize
             rewrite();
+            NereidsTracer.logImportantTime("EndRewritePlan");
             if (explainLevel == ExplainLevel.REWRITTEN_PLAN || explainLevel == ExplainLevel.ALL_PLAN) {
                 rewrittenPlan = cascadesContext.getRewritePlan();
                 if (explainLevel == ExplainLevel.REWRITTEN_PLAN) {
@@ -223,6 +232,7 @@ public class NereidsPlanner extends Planner {
             deriveStats();
 
             optimize();
+            NereidsTracer.logImportantTime("EndOptimizePlan");
 
             // print memo before choose plan.
             // if chooseNthPlan failed, we could get memo to debug
@@ -254,6 +264,9 @@ public class NereidsPlanner extends Planner {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+            }
+            if (statementContext.getConnectContext().getSessionVariable().isEnableNereidsTrace()) {
+                NereidsTracer.output(statementContext.getConnectContext().getSessionVariable());
             }
 
             timeoutExecutor.ifPresent(ExecutorService::shutdown);
@@ -358,7 +371,7 @@ public class NereidsPlanner extends Planner {
         jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
         jsonObj.put("ParsedPlan", parsedPlan.toJson());
         jsonObj.put("ResultPlan", optimizedPlan.toJson());
-        EventChannel.getDefaultChannel().run();
+//        EventChannel.getDefaultChannel().run();
 //        jsonObj.put("EventChannel", EventChannel.getDefaultChannel().toString());
 
         // Write the JSON object to a string and put it into file

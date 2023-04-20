@@ -134,6 +134,8 @@ public class Minidump {
         connectContext.setDatabase(minidump.getDbName());
         connectContext.getSessionVariable().setPlanNereidsDump(true);
         connectContext.getSessionVariable().setEnableNereidsTimeout(false);
+        connectContext.getSessionVariable().setEnableNereidsPlanner(true);
+        connectContext.getSessionVariable().setEnableNereidsTrace(true);
         connectContext.getSessionVariable().setNereidsTraceEventMode("all");
         connectContext.getTotalColumnStatisticMap().putAll(minidump.getTotalColumnStatisticMap());
         Env.getCurrentEnv().setColocateTableIndex(minidump.getColocateTableIndex());

@@ -66,6 +66,9 @@ public class TimeUtils {
     // it must be used as synchronized externally.
     private static final SimpleDateFormat DATE_FORMAT;
     private static final SimpleDateFormat DATETIME_FORMAT;
+
+    private static final SimpleDateFormat DATETIME_MS_FORMAT;
+
     private static final SimpleDateFormat TIME_FORMAT;
 
     public static final Pattern DATETIME_FORMAT_REG =
@@ -100,6 +103,10 @@ public class TimeUtils {
         DATETIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         DATETIME_FORMAT.setTimeZone(TIME_ZONE);
 
+        DATETIME_MS_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        DATETIME_MS_FORMAT.setTimeZone(TIME_ZONE);
+
+
         TIME_FORMAT = new SimpleDateFormat("HH");
         TIME_FORMAT.setTimeZone(TIME_ZONE);
 
@@ -126,6 +133,10 @@ public class TimeUtils {
 
     public static synchronized String getCurrentFormatTime() {
         return DATETIME_FORMAT.format(new Date());
+    }
+
+    public static synchronized String getCurrentFormatMsTime() {
+        return DATETIME_MS_FORMAT.format(new Date());
     }
 
     public static TimeZone getTimeZone() {

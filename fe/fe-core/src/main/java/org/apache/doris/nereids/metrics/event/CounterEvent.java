@@ -52,9 +52,9 @@ public class CounterEvent extends Event {
 
     public static CounterEvent of(long stateId, CounterType counterType, Group group,
             GroupExpression groupExpression, Plan plan) {
-//        return checkConnectContext(CounterEvent.class)
-//                ? new CounterEvent(stateId, counterType, group, groupExpression, plan) : null;
-          return new CounterEvent(stateId, counterType, group, groupExpression, plan);
+        return checkConnectContext(CounterEvent.class)
+                ? new CounterEvent(stateId, counterType, group, groupExpression, plan) : null;
+//          return new CounterEvent(stateId, counterType, group, groupExpression, plan);
     }
 
     @Override

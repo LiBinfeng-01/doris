@@ -48,6 +48,8 @@ import java.util.Set;
  */
 public abstract class Job implements TracerSupplier {
     // counter tracer to count expression transform times.
+    public static final EventProducer REWRITE_RULE_TRACER = new EventProducer(TransformEvent.class,
+        EventChannel.getDefaultChannel().addConsumers(new LogConsumer(TransformEvent.class, EventChannel.LOG)));
     protected static final EventProducer COUNTER_TRACER = new EventProducer(CounterEvent.class,
             EventChannel.getDefaultChannel()
                     .addEnhancers(new AddCounterEventEnhancer())

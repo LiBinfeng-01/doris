@@ -17,11 +17,16 @@
 
 package org.apache.doris.nereids.metrics.event;
 
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.metrics.Event;
+import org.apache.doris.nereids.metrics.consumer.LogConsumer;
 import org.apache.doris.nereids.properties.PhysicalProperties;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Log;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.util.Utils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * enforcer event
@@ -42,15 +47,23 @@ public class EnforcerEvent extends Event {
 
     public static EnforcerEvent of(GroupExpression groupExpression, PhysicalPlan enforce, PhysicalProperties before,
             PhysicalProperties after) {
-        return checkConnectContext(EnforcerEvent.class)
-                ? new EnforcerEvent(groupExpression, enforce, before, after) : null;
+        EnforcerEvent thisEvent = new EnforcerEvent(groupExpression, enforce, before, after);
+        JSONObject eventJson = new JSONObject();
+        eventJson.put(LogConsumer.getCurrentTime(), thisEvent.toJson());
+        LogConsumer.getEnforcerEvent().put(eventJson);
+        return null;
     }
 
     @Override
     public String toString() {
-        return Utils.toSqlString("EnforcerEvent", "groupExpression", groupExpression,
-                "enforce", enforce,
-                "before", before,
-                "after", after);
+        return toJson().toString();
+    }
+
+    public JSONObject toJson() {
+        JSONObject jsonObj = new JSONObject();
+        jsonObj.put("Enforcer", enforce.toJson());
+        jsonObj.put("BeforeProperties", before.toString());
+        jsonObj.put("AfterProperties", after.toString());
+        return jsonObj;
     }
 }

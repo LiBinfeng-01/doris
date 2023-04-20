@@ -17,9 +17,12 @@
 
 package org.apache.doris.nereids.metrics.event;
 
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.metrics.consumer.LogConsumer;
 import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.util.Utils;
+import org.json.JSONObject;
 
 /**
  * cost state event
@@ -36,13 +39,23 @@ public class CostStateUpdateEvent extends StateEvent {
 
     public static CostStateUpdateEvent of(GroupExpression groupExpression, double cost,
             PhysicalProperties physicalProperties) {
-        return checkConnectContext(CostStateUpdateEvent.class)
-                ? new CostStateUpdateEvent(groupExpression, cost, physicalProperties) : null;
+        CostStateUpdateEvent thisEvent = new CostStateUpdateEvent(groupExpression, cost, physicalProperties);
+        JSONObject eventJson = new JSONObject();
+        eventJson.put(LogConsumer.getCurrentTime(), thisEvent.toJson());
+        LogConsumer.getCostStateUpdateEvent().put(eventJson);
+        return null;
     }
 
     @Override
     public String toString() {
         return Utils.toSqlString("CostStateEvent", "groupExpression", getGroupExpression(),
                 "cost", cost, "physicalProperties", physicalProperties);
+    }
+
+    public JSONObject toJson() {
+        JSONObject jsonObj = new JSONObject();
+        jsonObj.put("Cost", cost);
+        jsonObj.put("Property", physicalProperties.toString());
+        return jsonObj;
     }
 }
