@@ -113,7 +113,6 @@ public abstract class BatchRewriteJob {
             do {
                 jobContext.setRewritten(false);
                 job.execute(jobContext);
-                NereidsTracer.logRewriteEvent(job.getClass().toString());
             } while (!job.isOnce() && jobContext.isRewritten());
         }
     }

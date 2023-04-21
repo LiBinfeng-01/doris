@@ -108,6 +108,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.doris.statistics.ColumnStatistic.UNKNOWN;
+
 /**
  * Used to calculate the stats for each plan
  */
@@ -119,13 +121,16 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
 
     private Map<String, ColumnStatistic> totalColumnStatisticMap = new HashMap<>();
 
+    private boolean isPlayNereidsDump = false;
+
     private Map<String, Histogram> totalHistogramMap = new HashMap<>();
 
     private StatsCalculator(GroupExpression groupExpression, boolean forbidUnknownColStats,
-                                Map<String, ColumnStatistic> columnStatisticMap) {
+                                Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump) {
         this.groupExpression = groupExpression;
         this.forbidUnknownColStats = forbidUnknownColStats;
         this.totalColumnStatisticMap = columnStatisticMap;
+        this.isPlayNereidsDump = isPlayNereidsDump;
     }
 
     public Map<String, Histogram> getTotalHistogramMap() {
@@ -148,15 +153,15 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
      * estimate stats
      */
     public static StatsCalculator estimate(GroupExpression groupExpression, boolean forbidUnknownColStats,
-                                           Map<String, ColumnStatistic> connectColumnStatisticMap) {
+                                           Map<String, ColumnStatistic> connectColumnStatisticMap, boolean isPlayNereidsDump) {
         StatsCalculator statsCalculator =
-                new StatsCalculator(groupExpression, forbidUnknownColStats, connectColumnStatisticMap);
+                new StatsCalculator(groupExpression, forbidUnknownColStats, connectColumnStatisticMap, isPlayNereidsDump);
         statsCalculator.estimate();
         return statsCalculator;
     }
 
     public static void estimate(GroupExpression groupExpression) {
-        StatsCalculator statsCalculator = new StatsCalculator(groupExpression, false, new HashMap<>());
+        StatsCalculator statsCalculator = new StatsCalculator(groupExpression, false, new HashMap<>(), false);
         statsCalculator.estimate();
     }
 
@@ -455,6 +460,8 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
     private ColumnStatistic getColumnStatistic(TableIf table, String colName) {
         if (totalColumnStatisticMap.get(table.getName() + colName) != null) {
             return totalColumnStatisticMap.get(table.getName() + colName);
+        } else if (isPlayNereidsDump) {
+            return ColumnStatistic.UNKNOWN;
         } else {
             return Env.getCurrentEnv().getStatisticsCache().getColumnStatistics(table.getId(), colName);
         }
@@ -483,7 +490,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
                 throw new RuntimeException(String.format("Invalid slot: %s", slotReference.getExprId()));
             }
             ColumnStatistic cache = getColumnStatistic(table, colName);
-            if (cache == ColumnStatistic.UNKNOWN) {
+            if (cache == UNKNOWN) {
                 if (forbidUnknownColStats) {
                     throw new AnalysisException("column stats for " + colName
                             + " is unknown, `set forbid_unknown_col_stats = false` to execute sql with unknown stats");
@@ -502,6 +509,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
                 totalHistogramMap.put(table.getName() + colName, histogram);
             }
             columnStatisticMap.put(slotReference, cache);
+            totalColumnStatisticMap.put(table.getName() + colName, cache);
         }
         return new Statistics(rowCount, columnStatisticMap);
     }
@@ -730,7 +738,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
                     ColumnStatistic value = null;
                     Set<Slot> slots = expr.getInputSlots();
                     if (slots.isEmpty()) {
-                        value = ColumnStatistic.UNKNOWN;
+                        value = UNKNOWN;
                     } else {
                         for (Slot slot : slots) {
                             if (childColumnStats.containsKey(slot)) {
@@ -740,7 +748,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
                         }
                         if (value == null) {
                             // todo: how to set stats?
-                            value = ColumnStatistic.UNKNOWN;
+                            value = UNKNOWN;
                         }
                     }
                     return Pair.of(expr.toSlot(), value);

@@ -16,10 +16,16 @@ package org.apache.doris.nereids.minidump;// Licensed to the Apache Software Fou
 // under the License.
 
 import com.alibaba.fastjson2.JSON;
+import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.TimeUtils;
+import org.apache.doris.nereids.cost.Cost;
+import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.pattern.Pattern;
+import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -33,20 +39,27 @@ import java.util.List;
  */
 public class NereidsTracer {
     private static long startTime;
+    private static String TRACE_PATH = null;
 
-    private static final String logFile = "/Users/libinfeng/workspace/doris/fe/log/minidump/dumpDemo/metriclog";
+    private static boolean shouldLog = false;
 
     private static JSONObject totalTraces = new JSONObject();
+
+    private static JSONArray sortedTraces = new JSONArray();
 
     private static JSONArray enforcerEvent = new JSONArray();
 
     private static JSONArray rewriteEvent = new JSONArray();
 
-    private static JSONArray costStateUpdateEvent = new JSONArray();
+    private static JSONArray applyRuleEvent = new JSONArray();
 
-    private static JSONArray transformEvent = new JSONArray();
+    private static JSONArray propertyAndCostEvent = new JSONArray();
 
     private static JSONArray importantTime = new JSONArray();
+
+    private static void saveSorted(JSONObject timeEvent) {
+        sortedTraces.put(timeEvent);
+    }
 
     public static void setStartTime(long startTime) {
         NereidsTracer.startTime = startTime;
@@ -56,43 +69,94 @@ public class NereidsTracer {
         return String.valueOf(TimeUtils.getEstimatedTime(NereidsTracer.startTime)/1000) + "us";
     }
 
-    public static void logRewriteEvent(String rewriteMsg) {
+    public static void logRewriteEvent(String rule, Pattern<? extends Plan> pattern, Plan inputPlan, Plan outputPlan) {
+        if (!shouldLog) return;
         JSONObject rewriteEventJson = new JSONObject();
+        JSONObject rewriteMsg = new JSONObject();
+        rewriteMsg.put("RuleType", rule);
+        rewriteMsg.put("Input", inputPlan.toJson());
+        rewriteMsg.put("Output", outputPlan.toJson());
         rewriteEventJson.put(getCurrentTime(), rewriteMsg);
         rewriteEvent.put(rewriteEventJson);
+        saveSorted(rewriteEventJson);
     }
 
-    public static JSONArray getEnforcerEvent() {
-        return enforcerEvent;
+    public static void logApplyRuleEvent(String rule, Plan inputPlan, Plan outputPlan) {
+        if (!shouldLog) return;
+        JSONObject applyRuleEventJson = new JSONObject();
+        JSONObject rewriteMsg = new JSONObject();
+        rewriteMsg.put("RuleType", rule);
+        rewriteMsg.put("Input", inputPlan.toJson());
+        rewriteMsg.put("Output", outputPlan.toJson());
+        applyRuleEventJson.put(getCurrentTime(), rewriteMsg);
+        applyRuleEvent.put(applyRuleEventJson);
+        saveSorted(applyRuleEventJson);
     }
 
-    public static JSONArray getCostStateUpdateEvent() {
-        return costStateUpdateEvent;
+    public static void logPropertyAndCostEvent(String groupId, List<Group> children, Plan plan, PhysicalProperties requestProperty, Cost cost) {
+        if (!shouldLog) return;
+        JSONObject propertyAndCostJson = new JSONObject();
+        JSONObject propertyAndCost = new JSONObject();
+        String groupMsg = groupId + " -> ";
+        for (Group child : children) {
+            groupMsg = groupMsg + child.getGroupId() + "/";
+        }
+        propertyAndCost.put("GroupId", groupMsg);
+        propertyAndCost.put("Plan", plan.toJson());
+        propertyAndCost.put("PhysicalProperties", requestProperty.toString());
+        propertyAndCost.put("Cost", cost.toString());
+        propertyAndCostJson.put(getCurrentTime(), propertyAndCost);
+        propertyAndCostEvent.put(propertyAndCostJson);
+        saveSorted(propertyAndCostJson);
     }
 
-    public static JSONArray getTransformEvent() {
-        return transformEvent;
+    public static void logEnforcerEvent(String groupId, Plan plan, PhysicalProperties inputProperty, PhysicalProperties outputProperty) {
+        if (!shouldLog) return;
+        JSONObject enforcerEventJson = new JSONObject();
+        JSONObject enforcerMsg = new JSONObject();
+        enforcerMsg.put("GroupId", groupId);
+        enforcerMsg.put("Plan", plan.toJson());
+        enforcerMsg.put("InputProperty", inputProperty.toString());
+        enforcerMsg.put("OutputProperty", outputProperty.toString());
+        enforcerEventJson.put(getCurrentTime(), enforcerMsg);
+        enforcerEvent.put(enforcerEventJson);
+        saveSorted(enforcerEventJson);
     }
 
     public static void logImportantTime(String eventDesc) {
+        if (!shouldLog) return;
         JSONObject timeEvent = new JSONObject();
         timeEvent.put(getCurrentTime(), eventDesc);
         importantTime.put(timeEvent);
+        saveSorted(timeEvent);
     }
 
-    public static void output(SessionVariable sessionVariable)
+    public static void output(ConnectContext connectContext)
     {
+        if (!shouldLog) return;
+        String queryId = (connectContext.queryId() == null)
+            ? "traceDemo" : DebugUtil.printId(connectContext.queryId());
         totalTraces.put("ImportantTime", importantTime);
         totalTraces.put("RewriteEvent", rewriteEvent);
-        totalTraces.put("TransformEvent", transformEvent);
-        totalTraces.put("CostStateUpdateEvent", costStateUpdateEvent);
+        totalTraces.put("ApplyRuleEvent", applyRuleEvent);
+        totalTraces.put("PropertyAndCostPairs", propertyAndCostEvent);
         totalTraces.put("EnforcerEvent", enforcerEvent);
-        try {
-            FileWriter fileWriter = new FileWriter(logFile, true);
-            fileWriter.write(totalTraces.toString());
-            fileWriter.close();
+        try (FileWriter file = new FileWriter(TRACE_PATH + "/" + queryId)) {
+            file.write(totalTraces.toString());
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+        }
+    }
+
+    public static void init() {
+        NereidsTracer.shouldLog = true;
+        setStartTime(TimeUtils.getStartTime());
+        if (TRACE_PATH == null) {
+            TRACE_PATH = System.getenv("DORIS_HOME") + "/log/nereids_trace";
+        }
+        File traceDir = new File(TRACE_PATH);
+        if (!traceDir.exists()) {
+            traceDir.mkdirs();
         }
     }
 }

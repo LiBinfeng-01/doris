@@ -79,7 +79,8 @@ public class MinidumpUtils {
             for (int i = 0; i < columnStats.length(); i++) {
                 JSONObject oneColumnStat = (JSONObject) columnStats.get(i);
                 String colName = oneColumnStat.keys().next();
-                ColumnStatistic columnStatistic = ColumnStatistic.UNKNOWN;
+                String colStat = oneColumnStat.getString(colName);
+                ColumnStatistic columnStatistic = ColumnStatistic.fromJson(colStat);
                 columnStatisticMap.put(colName, columnStatistic);
             }
             String parsedPlanJson = inputJSON.getString("ParsedPlan");
@@ -123,7 +124,7 @@ public class MinidumpUtils {
             ColumnStatistic columnStatistic = entry.getValue();
             String colName = entry.getKey();
             JSONObject oneColumnStats = new JSONObject();
-            oneColumnStats.put(colName, columnStatistic.toString());
+            oneColumnStats.put(colName, columnStatistic.toJson());
             columnStatistics.put(oneColumnStats);
         }
         return columnStatistics;

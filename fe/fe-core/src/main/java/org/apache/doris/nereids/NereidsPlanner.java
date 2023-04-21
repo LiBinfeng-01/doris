@@ -23,6 +23,7 @@ import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.NereidsException;
 import org.apache.doris.common.Pair;
+import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.CascadesContext.Lock;
 import org.apache.doris.nereids.exceptions.AnalysisException;
@@ -106,7 +107,7 @@ public class NereidsPlanner extends Planner {
     @Override
     public void plan(StatementBase queryStmt, org.apache.doris.thrift.TQueryOptions queryOptions) {
         if (statementContext.getConnectContext().getSessionVariable().isEnableNereidsTrace()) {
-            NereidsTracer.setStartTime(TimeUtils.getStartTime());
+            NereidsTracer.init();
         }
         if (!(queryStmt instanceof LogicalPlanAdapter)) {
             throw new RuntimeException("Wrong type of queryStmt, expected: <? extends LogicalPlanAdapter>");
@@ -259,16 +260,13 @@ public class NereidsPlanner extends Planner {
                 try {
                     MinidumpUtils.init();
                     String queryId = (cascadesContext.getConnectContext().queryId() == null)
-                            ? "dumpDemo" : cascadesContext.getConnectContext().queryId().toString();
+                            ? "dumpDemo" : DebugUtil.printId(cascadesContext.getConnectContext().queryId());
                     serializeToDumpFile(plan, physicalPlan, queryId);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
-            if (statementContext.getConnectContext().getSessionVariable().isEnableNereidsTrace()) {
-                NereidsTracer.output(statementContext.getConnectContext().getSessionVariable());
-            }
-
+            NereidsTracer.output(statementContext.getConnectContext());
             timeoutExecutor.ifPresent(ExecutorService::shutdown);
 
             return physicalPlan;
@@ -349,6 +347,7 @@ public class NereidsPlanner extends Planner {
         }
         // Create a JSON object
         JSONObject jsonObj = new JSONObject();
+        jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
         // add session variable
         jsonObj.put("SessionVariable", cascadesContext.getConnectContext().getSessionVariable().toJson());
         // add tables
@@ -368,7 +367,6 @@ public class NereidsPlanner extends Planner {
         jsonObj.put("ColumnStatistics", columnStatistics);
         // todo: add histogram serialize
         // add original sql, parsed plan and optimized plan
-        jsonObj.put("Sql", statementContext.getOriginStatement().originStmt);
         jsonObj.put("ParsedPlan", parsedPlan.toJson());
         jsonObj.put("ResultPlan", optimizedPlan.toJson());
 //        EventChannel.getDefaultChannel().run();

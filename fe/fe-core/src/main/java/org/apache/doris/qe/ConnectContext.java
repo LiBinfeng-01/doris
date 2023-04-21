@@ -20,6 +20,7 @@ package org.apache.doris.qe;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.FunctionRegistry;
 import org.apache.doris.catalog.Table;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.Config;
@@ -492,6 +493,13 @@ public class ConnectContext {
             return Env.getCurrentEnv().getCatalogMgr().getCatalog(realCatalogName);
         }
         return env.getCatalogMgr().getCatalog(realCatalogName);
+    }
+
+    public FunctionRegistry getFunctionRegistry() {
+        if (env == null) {
+            return Env.getCurrentEnv().getFunctionRegistry();
+        }
+        return env.getFunctionRegistry();
     }
 
     public void changeDefaultCatalog(String catalogName) {

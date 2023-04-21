@@ -37,6 +37,10 @@ public class CustomRewriteJob implements RewriteJob {
 
     private final Supplier<CustomRewriter> customRewriter;
 
+    public RuleType getRuleType() {
+        return ruleType;
+    }
+
     /**
      * Constructor.
      */

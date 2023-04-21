@@ -17,6 +17,7 @@
 
 package org.apache.doris.nereids.minidump;
 
+import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.catalog.ColocateTableIndex;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.Table;
@@ -24,6 +25,7 @@ import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.glue.LogicalPlanAdapter;
 import org.apache.doris.nereids.parser.NereidsParser;
+import org.apache.doris.nereids.trees.plans.commands.ExplainCommand;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.OriginStatement;
@@ -135,16 +137,20 @@ public class Minidump {
         connectContext.getSessionVariable().setPlanNereidsDump(true);
         connectContext.getSessionVariable().setEnableNereidsTimeout(false);
         connectContext.getSessionVariable().setEnableNereidsPlanner(true);
-        connectContext.getSessionVariable().setEnableNereidsTrace(true);
+        connectContext.getSessionVariable().setEnableNereidsTrace(false);
         connectContext.getSessionVariable().setNereidsTraceEventMode("all");
         connectContext.getTotalColumnStatisticMap().putAll(minidump.getTotalColumnStatisticMap());
         Env.getCurrentEnv().setColocateTableIndex(minidump.getColocateTableIndex());
-
-        LogicalPlan parsed = new NereidsParser().parseSingle(minidump.getSql());
+        NereidsParser nereidsParser = new NereidsParser();
+        LogicalPlan parsed = nereidsParser.parseSingle(minidump.getSql());
+        if (parsed instanceof ExplainCommand) {
+            parsed = ((ExplainCommand) parsed).getLogicalPlan();
+        }
         NereidsPlanner nereidsPlanner = new NereidsPlanner(
                 new StatementContext(connectContext, new OriginStatement(minidump.getSql(), 0)));
         nereidsPlanner.plan(LogicalPlanAdapter.of(parsed));
         assert (nereidsPlanner.getOptimizedPlan().toJson().toString().equals(minidump.getResultPlanJson()));
         System.out.println("execute success");
+        System.exit(0);
     }
 }
