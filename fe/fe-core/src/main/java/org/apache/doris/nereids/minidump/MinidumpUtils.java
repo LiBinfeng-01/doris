@@ -22,15 +22,11 @@ import org.apache.doris.catalog.Table;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.statistics.ColumnStatistic;
 
+import org.apache.doris.statistics.Histogram;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +38,22 @@ import java.util.Map;
 public class MinidumpUtils {
 
     public static String DUMP_PATH = null;
+
+    /** Saving of minidump file to fe log path */
+    public static void saveMinidumpString(JSONObject minidump, String dumpName) {
+        String dumpPath = MinidumpUtils.DUMP_PATH + "/" + dumpName;
+        File minidumpFileDir = new File(dumpPath);
+        if (!minidumpFileDir.exists()) {
+            minidumpFileDir.mkdirs();
+        }
+        String jsonMinidump = minidump.toString();
+        try (FileWriter file = new FileWriter(dumpPath + "/" + "dumpFile.json")) {
+            file.write(jsonMinidump);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     /** Loading of minidump file */
     public static Minidump jsonMinidumpLoad(String dumpFilePath) throws IOException {
@@ -83,11 +95,20 @@ public class MinidumpUtils {
                 ColumnStatistic columnStatistic = ColumnStatistic.fromJson(colStat);
                 columnStatisticMap.put(colName, columnStatistic);
             }
+            JSONArray histogramJsonArray = (JSONArray) inputJSON.get("Histogram");
+            Map<String, Histogram> histogramMap = new HashMap<>();
+            for (int i = 0; i < histogramJsonArray.length(); i++) {
+                JSONObject histogramJson = (JSONObject) histogramJsonArray.get(i);
+                String colName = histogramJson.keys().next();
+                String colHistogram = histogramJson.getString(colName);
+                Histogram histogram = Histogram.deserializeFromJson(colHistogram);
+                histogramMap.put(colName, histogram);
+            }
             String parsedPlanJson = inputJSON.getString("ParsedPlan");
             String resultPlanJson = inputJSON.getString("ResultPlan");
 
             return new Minidump(sql, newSessionVariable, parsedPlanJson, resultPlanJson,
-                tables, catalogName, dbName, columnStatisticMap, newColocateTableIndex);
+                tables, catalogName, dbName, columnStatisticMap, histogramMap, newColocateTableIndex);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -128,6 +149,19 @@ public class MinidumpUtils {
             columnStatistics.put(oneColumnStats);
         }
         return columnStatistics;
+    }
+
+    /** serialize histogram and replace when loading to dumpfile and environment */
+    public static JSONArray serializeHistogram(Map<String, Histogram> totalHistogramMap) {
+        JSONArray histogramsJson = new JSONArray();
+        for (Map.Entry<String, Histogram> entry : totalHistogramMap.entrySet()) {
+            Histogram histogram = entry.getValue();
+            String colName = entry.getKey();
+            JSONObject oneHistogram = new JSONObject();
+            oneHistogram.put(colName, Histogram.serializeToJson(histogram));
+            histogramsJson.put(oneHistogram);
+        }
+        return histogramsJson;
     }
 
     /** init minidump utils before start to dump file, this will create a path */

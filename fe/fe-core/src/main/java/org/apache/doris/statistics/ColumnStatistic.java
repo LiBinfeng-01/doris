@@ -271,7 +271,7 @@ public class ColumnStatistic {
 
     public JSONObject toJson() {
         JSONObject statistic = new JSONObject();
-        statistic.put("NDV", ndv);
+        statistic.put("Ndv", ndv);
         statistic.put("MinValue", minValue);
         statistic.put("MaxValue", maxValue);
         statistic.put("Selectivity", selectivity);
@@ -306,8 +306,8 @@ public class ColumnStatistic {
             stat.getDouble("Selectivity"),
             null,
             null,
-            stat.getBoolean("Histogram"),
-            null
+            stat.getBoolean("IsUnKnown"),
+            Histogram.deserializeFromJson(stat.getString("Histogram"))
         );
     }
 

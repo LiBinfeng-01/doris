@@ -202,6 +202,15 @@ public class NereidsPlanner extends Planner {
                 queryAnalysisSpan.end();
             }
 
+            // minidump of input must be serialized first, this process ensure minidump string not null
+            MinidumpUtils.init();
+            String queryId = DebugUtil.printId(statementContext.getConnectContext().queryId());
+            try {
+                statementContext.getConnectContext().setMinidump(serializeInputsToDumpFile(plan, queryId));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
             if (statementContext.getConnectContext().getExecutor() != null) {
                 statementContext.getConnectContext().getExecutor().getPlannerProfile().setQueryAnalysisFinishTime();
             }
@@ -231,6 +240,7 @@ public class NereidsPlanner extends Planner {
             initMemo();
 
             deriveStats();
+            serializeStatUsed(statementContext.getConnectContext().getMinidump());
 
             optimize();
             NereidsTracer.logImportantTime("EndOptimizePlan");
@@ -256,15 +266,11 @@ public class NereidsPlanner extends Planner {
                     || explainLevel == ExplainLevel.SHAPE_PLAN) {
                 optimizedPlan = physicalPlan;
             }
-            if (cascadesContext.getConnectContext().getSessionVariable().isDumpNereids()) {
-                try {
-                    MinidumpUtils.init();
-                    String queryId = (cascadesContext.getConnectContext().queryId() == null)
-                            ? "dumpDemo" : DebugUtil.printId(cascadesContext.getConnectContext().queryId());
-                    serializeToDumpFile(plan, physicalPlan, queryId);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            // serialize optimized plan to dumpfile, dumpfile do not have this part means optimize failed
+            serializeOutputToDumpFile(optimizedPlan, statementContext.getConnectContext().getMinidump());
+            if (statementContext.getConnectContext().getSessionVariable().isDumpNereids()) {
+                MinidumpUtils.saveMinidumpString(statementContext.getConnectContext().getMinidump(),
+                    DebugUtil.printId(statementContext.getConnectContext().queryId()));
             }
             NereidsTracer.output(statementContext.getConnectContext());
             timeoutExecutor.ifPresent(ExecutorService::shutdown);
@@ -339,7 +345,7 @@ public class NereidsPlanner extends Planner {
         return new PlanPostProcessors(cascadesContext).process(physicalPlan);
     }
 
-    private void serializeToDumpFile(Plan parsedPlan, Plan optimizedPlan, String dumpName) throws IOException {
+    private JSONObject serializeInputsToDumpFile(Plan parsedPlan, String dumpName) throws IOException {
         String dumpPath = MinidumpUtils.DUMP_PATH + "/" + dumpName;
         File minidumpFileDir = new File(dumpPath);
         if (!minidumpFileDir.exists()) {
@@ -361,24 +367,25 @@ public class NereidsPlanner extends Planner {
         String colocateTableIndexPath = dumpPath + "/ColocateTableIndex";
         MinidumpUtils.serializeColocateTableIndex(colocateTableIndexPath, Env.getCurrentColocateIndex());
         jsonObj.put("ColocateTableIndex", "/ColocateTableIndex");
-        // add column statistics
-        JSONArray columnStatistics = MinidumpUtils.serializeColumnStatistic(
-                cascadesContext.getConnectContext().getTotalColumnStatisticMap());
-        jsonObj.put("ColumnStatistics", columnStatistics);
-        // todo: add histogram serialize
         // add original sql, parsed plan and optimized plan
         jsonObj.put("ParsedPlan", parsedPlan.toJson());
-        jsonObj.put("ResultPlan", optimizedPlan.toJson());
-//        EventChannel.getDefaultChannel().run();
-//        jsonObj.put("EventChannel", EventChannel.getDefaultChannel().toString());
-
         // Write the JSON object to a string and put it into file
-        String jsonString = jsonObj.toString();
-        try (FileWriter file = new FileWriter(dumpPath + "/" + "dumpFile.json")) {
-            file.write(jsonString);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        return jsonObj;
+    }
+
+    private void serializeOutputToDumpFile(Plan resultPlan, JSONObject jsonObj)
+    {
+        jsonObj.put("ResultPlan", resultPlan.toJson());
+    }
+
+    private void serializeStatUsed(JSONObject jsonObj) {
+        // add column statistics
+        JSONArray columnStatistics = MinidumpUtils.serializeColumnStatistic(
+            cascadesContext.getConnectContext().getTotalColumnStatisticMap());
+        jsonObj.put("ColumnStatistics", columnStatistics);
+        JSONArray histogramArray = MinidumpUtils.serializeHistogram(
+            cascadesContext.getConnectContext().getTotalHistogramMap());
+        jsonObj.put("Histogram", histogramArray);
     }
 
     @Override

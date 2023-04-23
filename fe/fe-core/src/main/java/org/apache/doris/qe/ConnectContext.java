@@ -52,6 +52,7 @@ import com.google.common.collect.Sets;
 import io.opentelemetry.api.trace.Tracer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONObject;
 import org.xnio.StreamConnection;
 
 import java.io.IOException;
@@ -149,6 +150,8 @@ public class ConnectContext {
     private boolean isResourceTagsSet = false;
 
     private String sqlHash;
+
+    private JSONObject minidump = null;
 
     // The FE ip current connected
     private String currentConnectedFEIp = "";
@@ -576,6 +579,14 @@ public class ConnectContext {
 
     public void setSqlHash(String sqlHash) {
         this.sqlHash = sqlHash;
+    }
+
+    public JSONObject getMinidump() {
+        return minidump;
+    }
+
+    public void setMinidump(JSONObject minidump) {
+        this.minidump = minidump;
     }
 
     public Tracer getTracer() {

@@ -31,6 +31,7 @@ import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.OriginStatement;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.statistics.ColumnStatistic;
+import org.apache.doris.statistics.Histogram;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -62,13 +63,15 @@ public class Minidump {
 
     private Map<String, ColumnStatistic> totalColumnStatisticMap = new HashMap<>();
 
+    private Map<String, Histogram> totalHistogramMap = new HashMap<>();
+
     private ColocateTableIndex colocateTableIndex;
 
     /** Minidump class used to save environment messages */
     public Minidump(String sql, SessionVariable sessionVariable,
                     String parsedPlanJson, String resultPlanJson, List<Table> tables,
                     String catalogName, String dbName, Map<String, ColumnStatistic> totalColumnStatisticMap,
-                    ColocateTableIndex colocateTableIndex) {
+                    Map<String, Histogram> totalHistogramMap, ColocateTableIndex colocateTableIndex) {
         this.sql = sql;
         this.sessionVariable = sessionVariable;
         this.parsedPlanJson = parsedPlanJson;
@@ -77,6 +80,7 @@ public class Minidump {
         this.catalogName = catalogName;
         this.dbName = dbName;
         this.totalColumnStatisticMap = totalColumnStatisticMap;
+        this.totalHistogramMap = totalHistogramMap;
         this.colocateTableIndex = colocateTableIndex;
     }
 
@@ -120,6 +124,10 @@ public class Minidump {
         return totalColumnStatisticMap;
     }
 
+    public Map<String, Histogram> getTotalHistogramMap() {
+        return totalHistogramMap;
+    }
+
     /** Nereids minidump entry, argument should be absolute address of minidump path */
     public static void main(String[] args) {
         assert (args.length == 1);
@@ -140,6 +148,7 @@ public class Minidump {
         connectContext.getSessionVariable().setEnableNereidsTrace(false);
         connectContext.getSessionVariable().setNereidsTraceEventMode("all");
         connectContext.getTotalColumnStatisticMap().putAll(minidump.getTotalColumnStatisticMap());
+        connectContext.getTotalHistogramMap().putAll(minidump.getTotalHistogramMap());
         Env.getCurrentEnv().setColocateTableIndex(minidump.getColocateTableIndex());
         NereidsParser nereidsParser = new NereidsParser();
         LogicalPlan parsed = nereidsParser.parseSingle(minidump.getSql());

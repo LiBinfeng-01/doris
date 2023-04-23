@@ -470,6 +470,8 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
     private Histogram getColumnHistogram(TableIf table, String colName) {
         if (totalHistogramMap.get(table.getName() + colName) != null) {
             return totalHistogramMap.get(table.getName() + colName);
+        } else if (isPlayNereidsDump) {
+            return null;
         } else {
             return Env.getCurrentEnv().getStatisticsCache().getHistogram(table.getId(), colName);
         }
@@ -510,6 +512,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
             }
             columnStatisticMap.put(slotReference, cache);
             totalColumnStatisticMap.put(table.getName() + colName, cache);
+            totalHistogramMap.put(table.getName() + colName, histogram);
         }
         return new Statistics(rowCount, columnStatisticMap);
     }
