@@ -25,6 +25,9 @@ import org.apache.doris.nereids.trees.plans.PlanType;
 import org.apache.doris.nereids.trees.plans.UnaryPlan;
 import org.apache.doris.statistics.Statistics;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -48,5 +51,17 @@ public abstract class PhysicalUnary<CHILD_TYPE extends Plan>
             LogicalProperties logicalProperties, @Nullable PhysicalProperties physicalProperties,
             Statistics statistics, CHILD_TYPE child) {
         super(type, groupExpression, logicalProperties, physicalProperties, statistics, child);
+    }
+
+    @Override
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        JSONArray childrenJson = new JSONArray();
+        for (Plan child : children) {
+            childrenJson.put(child.toJson());
+        }
+        json.put("children", childrenJson);
+        return json;
     }
 }

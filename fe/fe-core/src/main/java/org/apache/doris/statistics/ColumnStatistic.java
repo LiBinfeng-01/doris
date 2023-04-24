@@ -26,6 +26,7 @@ import org.apache.doris.statistics.util.StatisticsUtil;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONObject;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -102,6 +103,7 @@ public class ColumnStatistic {
             double selectivity, LiteralExpr minExpr, LiteralExpr maxExpr, boolean isUnKnown, Histogram histogram) {
         this.count = count;
         this.ndv = ndv;
+        this.originalNdv = originalNdv;
         this.avgSizeByte = avgSizeByte;
         this.numNulls = numNulls;
         this.dataSize = dataSize;
@@ -112,7 +114,6 @@ public class ColumnStatistic {
         this.maxExpr = maxExpr;
         this.isUnKnown = isUnKnown;
         this.histogram = histogram;
-        this.originalNdv = originalNdv;
     }
 
     // TODO: use thrift
@@ -266,6 +267,46 @@ public class ColumnStatistic {
     public String toString() {
         return isUnKnown ? "unKnown" : String.format("ndv=%.4f, min=%f, max=%f, sel=%f, count=%.4f",
                 ndv, minValue, maxValue, selectivity, count);
+    }
+
+    public JSONObject toJson() {
+        JSONObject statistic = new JSONObject();
+        statistic.put("Ndv", ndv);
+        statistic.put("MinValue", minValue);
+        statistic.put("MaxValue", maxValue);
+        statistic.put("Selectivity", selectivity);
+        statistic.put("Count", count);
+        statistic.put("AvgSizeByte", avgSizeByte);
+        statistic.put("NumNulls", numNulls);
+        statistic.put("DataSize", dataSize);
+        statistic.put("Selectivity", selectivity);
+        statistic.put("MinExpr", minExpr);
+        statistic.put("MaxExpr", maxExpr);
+        statistic.put("IsUnKnown", isUnKnown);
+        statistic.put("Histogram", Histogram.serializeToJson(histogram));
+        statistic.put("OriginalNdv", originalNdv);
+        return statistic;
+    }
+
+    // MinExpr and MaxExpr serialize and deserialize is not complete
+    // Histogram is got by other place
+    public static ColumnStatistic fromJson(String statJson) {
+        JSONObject stat = new JSONObject(statJson);
+        return new ColumnStatistic(
+            stat.getDouble("Count"),
+            stat.getDouble("Ndv"),
+            stat.getDouble("OriginalNdv"),
+            stat.getDouble("AvgSizeByte"),
+            stat.getDouble("NumNulls"),
+            stat.getDouble("DataSize"),
+            stat.getDouble("MinValue"),
+            stat.getDouble("MaxValue"),
+            stat.getDouble("Selectivity"),
+            null,
+            null,
+            stat.getBoolean("IsUnKnown"),
+            Histogram.deserializeFromJson(stat.getString("Histogram"))
+        );
     }
 
     public boolean minOrMaxIsInf() {

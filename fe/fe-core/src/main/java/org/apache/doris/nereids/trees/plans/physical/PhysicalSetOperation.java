@@ -31,6 +31,8 @@ import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
 import com.google.common.collect.ImmutableList;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.List;
 import java.util.Objects;
@@ -128,6 +130,18 @@ public abstract class PhysicalSetOperation extends AbstractPhysicalPlan implemen
     @Override
     public int getArity() {
         return children.size();
+    }
+
+    @Override
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        JSONArray childrenJson = new JSONArray();
+        for (Plan child : children) {
+            childrenJson.put(child.toJson());
+        }
+        json.put("children", childrenJson);
+        return json;
     }
 
 }

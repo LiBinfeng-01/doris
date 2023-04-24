@@ -24,6 +24,9 @@ import org.apache.doris.nereids.trees.plans.BinaryPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PlanType;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -43,4 +46,16 @@ public abstract class LogicalBinary<
     }
 
     public abstract List<Slot> computeOutput();
+
+    @Override
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        JSONArray childrenJson = new JSONArray();
+        for (Plan child : children) {
+            childrenJson.put(child.toJson());
+        }
+        json.put("children", childrenJson);
+        return json;
+    }
 }

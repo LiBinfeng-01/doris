@@ -45,6 +45,10 @@ public class CustomRewriteJob implements RewriteJob {
         this.customRewriter = Objects.requireNonNull(rewriter, "customRewriter cannot be null");
     }
 
+    public RuleType getRuleType() {
+        return ruleType;
+    }
+
     @Override
     public void execute(JobContext context) {
         Set<String> disableRules = Job.getDisableRules(context);

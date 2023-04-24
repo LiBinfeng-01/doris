@@ -25,6 +25,9 @@ import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PlanType;
 import org.apache.doris.statistics.Statistics;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -45,5 +48,17 @@ public abstract class PhysicalBinary<LEFT_CHILD_TYPE extends Plan, RIGHT_CHILD_T
             LogicalProperties logicalProperties, @Nullable PhysicalProperties physicalProperties,
             @Nullable Statistics statistics, LEFT_CHILD_TYPE leftChild, RIGHT_CHILD_TYPE rightChild) {
         super(type, groupExpression, logicalProperties, physicalProperties, statistics, leftChild, rightChild);
+    }
+
+    @Override
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("PlanType", getType().toString());
+        JSONArray childrenJson = new JSONArray();
+        for (Plan child : children) {
+            childrenJson.put(child.toJson());
+        }
+        json.put("children", childrenJson);
+        return json;
     }
 }

@@ -25,6 +25,7 @@ import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,8 @@ public class LogicalPlanAdapter extends StatementBase implements Queriable {
 
     private final StatementContext statementContext;
     private final LogicalPlan logicalPlan;
+
+    private PhysicalPlan physicalPlan;
     private List<Expr> resultExprs;
     private ArrayList<String> colLabels;
 
@@ -53,6 +56,14 @@ public class LogicalPlanAdapter extends StatementBase implements Queriable {
 
     public LogicalPlan getLogicalPlan() {
         return logicalPlan;
+    }
+
+    public void setPhysicalPlan(PhysicalPlan physicalPlan) {
+        this.physicalPlan = physicalPlan;
+    }
+
+    public PhysicalPlan getPhysicalPlan() {
+        return physicalPlan;
     }
 
     @Override
