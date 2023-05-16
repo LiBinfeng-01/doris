@@ -280,7 +280,7 @@ public class ColumnStatistic {
         } else if (Double.isNaN(minValue)) {
             statistic.put("MinValueType", "Invalid");
         } else {
-            statistic.put("MinValueInfinite", "Normal");
+            statistic.put("MinValueType", "Normal");
             statistic.put("MinValue", minValue);
         }
         if (Double.isInfinite(maxValue)) {
