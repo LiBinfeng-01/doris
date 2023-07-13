@@ -27,6 +27,7 @@ import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalSelectHint;
 import org.apache.doris.nereids.trees.plans.visitor.CustomRewriter;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.qe.VariableMgr;
 
@@ -55,6 +56,8 @@ public class EliminateLogicalSelectHint extends PlanPreprocessor implements Cust
             String hintName = hint.getKey();
             if (hintName.equalsIgnoreCase("SET_VAR")) {
                 setVar(hint.getValue(), context);
+            } else if (hintName.equalsIgnoreCase("ORDERED")) {
+                ConnectContext.get().getSessionVariable().setDisableJoinReorder(true);
             } else {
                 logger.warn("Can not process select hint '{}' and skip it", hint.getKey());
             }
