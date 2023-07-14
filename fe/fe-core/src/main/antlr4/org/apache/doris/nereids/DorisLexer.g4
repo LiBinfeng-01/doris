@@ -231,6 +231,7 @@ LAST: 'LAST';
 LATERAL: 'LATERAL';
 LAZY: 'LAZY';
 LEADING: 'LEADING';
+LEFT_BRACE: '{';
 LEFT: 'LEFT';
 LIKE: 'LIKE';
 ILIKE: 'ILIKE';
@@ -317,6 +318,7 @@ RESTRICT: 'RESTRICT';
 RESTRICTIVE: 'RESTRICTIVE';
 REVOKE: 'REVOKE';
 REWRITTEN: 'REWRITTEN';
+RIGHT_BRACE: '}';
 RIGHT: 'RIGHT';
 // original optimizer only support REGEXP, the new optimizer should be consistent with it
 RLIKE: 'RLIKE';
@@ -439,6 +441,11 @@ STRING
     | '"' ( ~('"'|'\\') | ('\\' .) )* '"'
     | 'R\'' (~'\'')* '\''
     | 'R"'(~'"')* '"'
+    ;
+
+LEADING_STRING
+    : LEFT_BRACE
+    | RIGHT_BRACE
     ;
 
 BIGINT_LITERAL

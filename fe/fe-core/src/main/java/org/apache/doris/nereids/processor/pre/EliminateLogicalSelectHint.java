@@ -23,6 +23,8 @@ import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.jobs.JobContext;
 import org.apache.doris.nereids.properties.SelectHint;
+import org.apache.doris.nereids.properties.SelectHintLeading;
+import org.apache.doris.nereids.properties.SelectHintSetVar;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalSelectHint;
@@ -55,9 +57,11 @@ public class EliminateLogicalSelectHint extends PlanPreprocessor implements Cust
         for (Entry<String, SelectHint> hint : selectHintPlan.getHints().entrySet()) {
             String hintName = hint.getKey();
             if (hintName.equalsIgnoreCase("SET_VAR")) {
-                setVar(hint.getValue(), context);
+                setVar((SelectHintSetVar) hint.getValue(), context);
             } else if (hintName.equalsIgnoreCase("ORDERED")) {
                 ConnectContext.get().getSessionVariable().setDisableJoinReorder(true);
+            } else if (hintName.equalsIgnoreCase("LEADING")) {
+                extractLeading((SelectHintLeading) hint.getValue(), context);
             } else {
                 logger.warn("Can not process select hint '{}' and skip it", hint.getKey());
             }
@@ -66,7 +70,7 @@ public class EliminateLogicalSelectHint extends PlanPreprocessor implements Cust
         return (LogicalPlan) selectHintPlan.child();
     }
 
-    private void setVar(SelectHint selectHint, StatementContext context) {
+    private void setVar(SelectHintSetVar selectHint, StatementContext context) {
         SessionVariable sessionVariable = context.getConnectContext().getSessionVariable();
         // set temporary session value, and then revert value in the 'finally block' of StmtExecutor#execute
         sessionVariable.setIsSingleSetVar(true);
@@ -93,5 +97,10 @@ public class EliminateLogicalSelectHint extends PlanPreprocessor implements Cust
             }
             throw new AnalysisException("The nereids is disabled in this sql, fallback to original planner");
         }
+    }
+
+    private void extractLeading(SelectHintLeading selectHint, StatementContext context) {
+        assert (selectHint != null);
+        assert (context != null);
     }
 }
