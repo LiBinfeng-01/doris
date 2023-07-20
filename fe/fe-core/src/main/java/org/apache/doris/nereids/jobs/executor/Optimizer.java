@@ -20,7 +20,6 @@ package org.apache.doris.nereids.jobs.executor;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.StatementContext;
-import org.apache.doris.nereids.cost.Cost;
 import org.apache.doris.nereids.hint.Hint;
 import org.apache.doris.nereids.hint.LeadingHint;
 import org.apache.doris.nereids.jobs.cascades.DeriveStatsJob;
@@ -28,7 +27,6 @@ import org.apache.doris.nereids.jobs.cascades.OptimizeGroupJob;
 import org.apache.doris.nereids.jobs.joinorder.JoinOrderJob;
 import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.memo.Group;
-import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.plans.JoinHint;
@@ -45,7 +43,13 @@ import org.apache.doris.qe.SessionVariable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.Stack;
 
 /**
  * Cascades style optimize:
@@ -112,14 +116,15 @@ public class Optimizer {
                     // check join is legal and get join type
                     JoinType joinType = JoinType.INNER_JOIN;
                     newStackTop = stack.pop();
-                    List<Expression> conditions = getJoinConditions(leading.getFilters(), newStackTop.second, logicalPlan);
+                    List<Expression> conditions = getJoinConditions(
+                            leading.getFilters(), newStackTop.second, logicalPlan);
                     // get joinType
                     LogicalJoin logicalJoin = new LogicalJoin<>(joinType, ExpressionUtils.EMPTY_CONDITION,
-                        conditions,
-                        JoinHint.NONE,
-                        Optional.empty(),
-                        newStackTop.second,
-                        logicalPlan);
+                            conditions,
+                            JoinHint.NONE,
+                            Optional.empty(),
+                            newStackTop.second,
+                            logicalPlan);
                     if (stackTopLevel > 0) {
                         stackTopLevel--;
                     }
@@ -142,7 +147,8 @@ public class Optimizer {
         return stack.pop().second;
     }
 
-    private List<Expression> getJoinConditions(List<Pair<Long,Expression>> filters, LogicalPlan left, LogicalPlan right) {
+    private List<Expression> getJoinConditions(List<Pair<Long, Expression>> filters,
+                                                    LogicalPlan left, LogicalPlan right) {
         List<Expression> joinConditions = new ArrayList<>();
         for (int i = filters.size() - 1; i >= 0; i--) {
             Pair<Long, Expression> filterPair = filters.get(i);
@@ -155,7 +161,7 @@ public class Optimizer {
         return joinConditions;
     }
 
-    private LogicalPlan makeFilterPlanIfExist(List<Pair<Long,Expression>> filters, LogicalPlan scan) {
+    private LogicalPlan makeFilterPlanIfExist(List<Pair<Long, Expression>> filters, LogicalPlan scan) {
         Set<Expression> newConjuncts = new HashSet<>();
         for (int i = filters.size() - 1; i >= 0; i--) {
             Pair<Long, Expression> filterPair = filters.get(i);
@@ -175,7 +181,7 @@ public class Optimizer {
         if (root instanceof LogicalJoin) {
             return ((LogicalJoin) root).getBitmap();
         } else if (root instanceof LogicalRelation) {
-            return ((LogicalRelation) root).getTable().getId();
+            return LongBitmap.set(0L, (((LogicalRelation) root).getRelationId().asInt()));
         } else if (root instanceof LogicalFilter) {
             return getBitmap((LogicalPlan) root.child(0));
         } else {

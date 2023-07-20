@@ -98,16 +98,16 @@ public class LogicalJoin<LEFT_CHILD_TYPE extends Plan, RIGHT_CHILD_TYPE extends 
     }
 
     public LogicalJoin(
-        long bitmap,
-        JoinType joinType,
-        List<Expression> hashJoinConjuncts,
-        List<Expression> otherJoinConjuncts,
-        JoinHint hint,
-        Optional<MarkJoinSlotReference> markJoinSlotReference,
-        LEFT_CHILD_TYPE leftChild, RIGHT_CHILD_TYPE rightChild) {
+            long bitmap,
+            JoinType joinType,
+            List<Expression> hashJoinConjuncts,
+            List<Expression> otherJoinConjuncts,
+            JoinHint hint,
+            Optional<MarkJoinSlotReference> markJoinSlotReference,
+            LEFT_CHILD_TYPE leftChild, RIGHT_CHILD_TYPE rightChild) {
         this(joinType, hashJoinConjuncts,
-            otherJoinConjuncts, hint, markJoinSlotReference,
-            Optional.empty(), Optional.empty(), leftChild, rightChild);
+                otherJoinConjuncts, hint, markJoinSlotReference,
+                Optional.empty(), Optional.empty(), leftChild, rightChild);
         this.bitmap = LongBitmap.or(this.bitmap, bitmap);
     }
 

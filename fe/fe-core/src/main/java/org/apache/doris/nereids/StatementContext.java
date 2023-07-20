@@ -176,14 +176,6 @@ public class StatementContext {
         return hintMap;
     }
 
-    public Set<String> getColumnNames() {
-        return columnNames == null ? new HashSet<>() : columnNames;
-    }
-
-    public void setColumnNames(Set<String> columnNames) {
-        this.columnNames = columnNames;
-    }
-
     public ColumnAliasGenerator getColumnAliasGenerator() {
         return columnAliasGenerator == null
             ? columnAliasGenerator = new ColumnAliasGenerator()
