@@ -198,16 +198,6 @@ hintStatement
     : hintName=identifier (LEFT_PAREN parameters+=hintAssignment (COMMA? parameters+=hintAssignment)* RIGHT_PAREN)?
     ;
 
-//bracket
-//    : LEFT_BRACKET
-//    | RIGHT_BRACKET
-//    ;
-//
-//leadingHintAssignment
-//    : key=identifierOrText
-//    | key=bracket
-//    ;
-
 hintAssignment
     : key=identifierOrText (EQ (constantValue=constant | identifierValue=identifier))?
     ;

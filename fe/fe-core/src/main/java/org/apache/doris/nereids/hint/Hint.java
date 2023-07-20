@@ -15,33 +15,45 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.nereids.properties;
+package org.apache.doris.nereids.hint;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
 /**
  * select hint.
  * e.g. set_var(query_timeout='1800', exec_mem_limit='2147483648')
  */
-public class SelectHintLeading extends SelectHint {
-    // e.g. query_timeout='1800', exec_mem_limit='2147483648'
-    private final List<String> parameters;
+public class Hint {
+    // e.g. set_var
+    private String hintName;
 
-    public SelectHintLeading(String hintName, List<String> parameters) {
-        super(hintName);
-        this.parameters = parameters;
+    private HintStatus status;
+
+    private final String errorMessage = "";
+
+    /**
+     * hint status which need to show in explain when it is not used or have syntax error
+     */
+    public enum HintStatus {
+        UNUSED,
+        SYNTAX_ERROR,
+        SUCCESS
     }
 
-    public List<String> getParameters() {
-        return parameters;
+    public Hint(String hintName) {
+        this.hintName = Objects.requireNonNull(hintName, "hintName can not be null");
+        this.status = HintStatus.UNUSED;
     }
 
-    @Override
-    public String toString() {
-        String leadingString = parameters
-                .stream()
-                .collect(Collectors.joining(", "));
-        return super.getHintName() + "(" + leadingString + ")";
+    public void setHintName(String hintName) {
+        this.hintName = hintName;
+    }
+
+    public HintStatus getStatus() {
+        return status;
+    }
+
+    public String getHintName() {
+        return hintName;
     }
 }

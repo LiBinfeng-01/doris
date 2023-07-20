@@ -18,7 +18,6 @@
 package org.apache.doris.nereids.properties;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -42,14 +41,14 @@ public class SelectHintSetVar extends SelectHint {
     @Override
     public String toString() {
         String kvString = parameters
-            .entrySet()
-            .stream()
-            .map(kv ->
-                kv.getValue().isPresent()
-                    ? kv.getKey() + "='" + kv.getValue().get() + "'"
-                    : kv.getKey()
-            )
-            .collect(Collectors.joining(", "));
+                .entrySet()
+                .stream()
+                .map(kv ->
+                        kv.getValue().isPresent()
+                        ? kv.getKey() + "='" + kv.getValue().get() + "'"
+                        : kv.getKey()
+                )
+                .collect(Collectors.joining(", "));
         return super.getHintName() + "(" + kvString + ")";
     }
 }

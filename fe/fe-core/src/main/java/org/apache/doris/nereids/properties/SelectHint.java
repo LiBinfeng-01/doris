@@ -17,10 +17,7 @@
 
 package org.apache.doris.nereids.properties;
 
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * select hint.

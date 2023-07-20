@@ -41,6 +41,7 @@ import org.apache.doris.nereids.rules.rewrite.CheckAndStandardizeWindowFunctionA
 import org.apache.doris.nereids.rules.rewrite.CheckDataTypes;
 import org.apache.doris.nereids.rules.rewrite.CheckMatchExpression;
 import org.apache.doris.nereids.rules.rewrite.CollectFilterAboveConsumer;
+import org.apache.doris.nereids.rules.rewrite.CollectJoinConstraint;
 import org.apache.doris.nereids.rules.rewrite.CollectProjectAboveConsumer;
 import org.apache.doris.nereids.rules.rewrite.ColumnPruning;
 import org.apache.doris.nereids.rules.rewrite.ConvertInnerOrCrossJoin;
@@ -299,7 +300,11 @@ public class Rewriter extends AbstractBatchJobExecutor {
                             new CollectFilterAboveConsumer(),
                             new CollectProjectAboveConsumer()
                     )
-            )
+            ),
+            topic("LEADING JOIN",
+                bottomUp(
+                    new CollectJoinConstraint()
+                ))
     );
 
     private static final List<RewriteJob> WHOLE_TREE_REWRITE_JOBS

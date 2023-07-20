@@ -21,6 +21,7 @@ import org.apache.doris.analysis.SetVar;
 import org.apache.doris.analysis.StringLiteral;
 import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.exceptions.AnalysisException;
+import org.apache.doris.nereids.hint.LeadingHint;
 import org.apache.doris.nereids.jobs.JobContext;
 import org.apache.doris.nereids.properties.SelectHint;
 import org.apache.doris.nereids.properties.SelectHintLeading;
@@ -100,6 +101,8 @@ public class EliminateLogicalSelectHint extends PlanPreprocessor implements Cust
     }
 
     private void extractLeading(SelectHintLeading selectHint, StatementContext context) {
+        LeadingHint hint = new LeadingHint("Leading", selectHint.getParameters());
+        context.getHintMap().put("Leading", hint);
         assert (selectHint != null);
         assert (context != null);
     }

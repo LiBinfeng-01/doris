@@ -17,19 +17,35 @@
 
 package org.apache.doris.nereids.jobs.executor;
 
+import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext;
+import org.apache.doris.nereids.StatementContext;
+import org.apache.doris.nereids.cost.Cost;
+import org.apache.doris.nereids.hint.Hint;
+import org.apache.doris.nereids.hint.LeadingHint;
 import org.apache.doris.nereids.jobs.cascades.DeriveStatsJob;
 import org.apache.doris.nereids.jobs.cascades.OptimizeGroupJob;
 import org.apache.doris.nereids.jobs.joinorder.JoinOrderJob;
+import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.memo.Group;
+import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
+import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.plans.JoinHint;
+import org.apache.doris.nereids.trees.plans.JoinType;
+import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
+import org.apache.doris.nereids.trees.plans.logical.LogicalJoin;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalRelation;
+import org.apache.doris.nereids.util.ExpressionUtils;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Cascades style optimize:
@@ -48,6 +64,11 @@ public class Optimizer {
      * execute optimize, use dphyp or cascades according to join number and session variables.
      */
     public void execute() {
+        // if we use leading, logical plan should be replaced before init to memo and join reorder should be forbidden
+        Hint leadingHint = cascadesContext.getStatementContext().getHintMap().get("Leading");
+        if (leadingHint != null) {
+            leadingOptimize((LeadingHint) leadingHint);
+        }
         // init memo
         cascadesContext.toMemo();
         // stats derive
@@ -72,7 +93,103 @@ public class Optimizer {
         cascadesContext.getJobScheduler().executeJobPool(cascadesContext);
     }
 
+    private Plan generateLeadingJoinPlan(LeadingHint leading) {
+        Stack<Pair<Integer, LogicalPlan>> stack = new Stack<>();
+        int index = 0;
+        LogicalPlan logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index));
+        logicalPlan = makeFilterPlanIfExist(leading.getFilters(), logicalPlan);
+        assert (logicalPlan != null);
+        stack.push(Pair.of(leading.getLevellist().get(index), logicalPlan));
+        int stackTopLevel = leading.getLevellist().get(index++);
+        while (index < leading.getTablelist().size()) {
+            int currentLevel = leading.getLevellist().get(index);
+            if (currentLevel == stackTopLevel) {
+                // should return error if can not found table
+                logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index++));
+                logicalPlan = makeFilterPlanIfExist(leading.getFilters(), logicalPlan);
+                Pair<Integer, LogicalPlan> newStackTop = stack.peek();
+                while (!(stack.isEmpty() || stackTopLevel != newStackTop.first)) {
+                    // check join is legal and get join type
+                    JoinType joinType = JoinType.INNER_JOIN;
+                    newStackTop = stack.pop();
+                    List<Expression> conditions = getJoinConditions(leading.getFilters(), newStackTop.second, logicalPlan);
+                    // get joinType
+                    LogicalJoin logicalJoin = new LogicalJoin<>(joinType, ExpressionUtils.EMPTY_CONDITION,
+                        conditions,
+                        JoinHint.NONE,
+                        Optional.empty(),
+                        newStackTop.second,
+                        logicalPlan);
+                    if (stackTopLevel > 0) {
+                        stackTopLevel--;
+                    }
+                    if (!stack.isEmpty()) {
+                        newStackTop = stack.peek();
+                    }
+                    logicalPlan = logicalJoin;
+                }
+                stack.push(Pair.of(stackTopLevel, logicalPlan));
+            } else {
+                // push
+                logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index++));
+                stack.push(Pair.of(currentLevel, logicalPlan));
+                stackTopLevel = currentLevel;
+            }
+        }
+
+        // we want all filters been remove
+        assert (leading.getFilters().isEmpty());
+        return stack.pop().second;
+    }
+
+    private List<Expression> getJoinConditions(List<Pair<Long,Expression>> filters, LogicalPlan left, LogicalPlan right) {
+        List<Expression> joinConditions = new ArrayList<>();
+        for (int i = filters.size() - 1; i >= 0; i--) {
+            Pair<Long, Expression> filterPair = filters.get(i);
+            Long tablesBitMap = LongBitmap.or(getBitmap(left), getBitmap(right));
+            if (LongBitmap.isSubset(filterPair.first, tablesBitMap)) {
+                joinConditions.add(filterPair.second);
+                filters.remove(i);
+            }
+        }
+        return joinConditions;
+    }
+
+    private LogicalPlan makeFilterPlanIfExist(List<Pair<Long,Expression>> filters, LogicalPlan scan) {
+        Set<Expression> newConjuncts = new HashSet<>();
+        for (int i = filters.size() - 1; i >= 0; i--) {
+            Pair<Long, Expression> filterPair = filters.get(i);
+            if (LongBitmap.isSubset(filterPair.first, getBitmap(scan))) {
+                newConjuncts.add(filterPair.second);
+                filters.remove(i);
+            }
+        }
+        if (newConjuncts.isEmpty()) {
+            return scan;
+        } else {
+            return new LogicalFilter<>(newConjuncts, scan);
+        }
+    }
+
+    private Long getBitmap(LogicalPlan root) {
+        if (root instanceof LogicalJoin) {
+            return ((LogicalJoin) root).getBitmap();
+        } else if (root instanceof LogicalRelation) {
+            return ((LogicalRelation) root).getTable().getId();
+        } else if (root instanceof LogicalFilter) {
+            return getBitmap((LogicalPlan) root.child(0));
+        } else {
+            return null;
+        }
+    }
+
     // DependsRules: EnsureProjectOnTopJoin.class
+    private void leadingOptimize(LeadingHint leading) {
+        Plan leadingPlan = generateLeadingJoinPlan(leading);
+        cascadesContext.setRewritePlan(leadingPlan);
+        getSessionVariable().setDisableJoinReorder(true);
+    }
+
     private void dpHypOptimize() {
         Group root = cascadesContext.getMemo().getRoot();
         // Due to EnsureProjectOnTopJoin, root group can't be Join Group, so DPHyp doesn't change the root group
