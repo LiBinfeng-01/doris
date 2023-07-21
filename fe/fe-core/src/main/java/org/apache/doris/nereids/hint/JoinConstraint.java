@@ -33,7 +33,17 @@ public class JoinConstraint {
 
     private final boolean lhsStrict;
 
-    public JoinConstraint(Long minLeftHand, Long minRightHand, Long leftHand, Long rightHand, JoinType joinType, boolean lhsStrict) {
+    /**
+     * join constraints which means restriction to some logical not equivalence of left join and semi join
+     * @param minLeftHand minimal left hand table bitmap which needed for a special join
+     * @param minRightHand minimal right hand table bitmap which needed for a special join
+     * @param leftHand left hand table bitmap below current join
+     * @param rightHand right hand table bitmap below current join
+     * @param joinType join type, here we only have full outer join, left join, semi join and anti join
+     * @param lhsStrict is left hand side strict
+     */
+    public JoinConstraint(Long minLeftHand, Long minRightHand, Long leftHand, Long rightHand,
+                            JoinType joinType, boolean lhsStrict) {
         this.minLeftHand = minLeftHand;
         this.minRightHand = minRightHand;
         this.leftHand = leftHand;

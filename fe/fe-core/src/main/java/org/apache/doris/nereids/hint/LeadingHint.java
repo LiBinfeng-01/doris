@@ -20,8 +20,6 @@ package org.apache.doris.nereids.hint;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.trees.expressions.Expression;
-import org.apache.doris.nereids.trees.plans.JoinType;
-import org.apache.doris.nereids.trees.plans.algebra.Join;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 
 import com.google.common.collect.Maps;
@@ -29,7 +27,6 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * select hint.
@@ -100,60 +97,72 @@ public class LeadingHint extends Hint {
         this.innerJoinBitmap = innerJoinBitmap;
     }
 
+    /**
+     * check if join is legal, if is not legal, leading hint will failed to generate plan
+     * @param joinTableBitmap table bitmap below this join
+     * @param leftTableBitmap table bitmap below right child
+     * @param rightTableBitmap table bitmap below right child
+     * @return boolean value used for judging whether the join is legal, and should this join need to reverse
+     */
     public boolean joinIsLegal(Long joinTableBitmap, Long leftTableBitmap, Long rightTableBitmap) {
-        boolean	reversed = false;
-        boolean	mustBeLeftjoin = false;
+        boolean reversed = false;
+        boolean mustBeLeftjoin = false;
 
         JoinConstraint matchedJoinConstraint = null;
 
-        for (JoinConstraint joinConstraint : joinConstraintList)
-        {
-            if (!LongBitmap.isOverlap(joinConstraint.getMinRightHand(), joinTableBitmap))
+        for (JoinConstraint joinConstraint : joinConstraintList) {
+            if (!LongBitmap.isOverlap(joinConstraint.getMinRightHand(), joinTableBitmap)) {
                 continue;
-
-            if (LongBitmap.isSubset(joinTableBitmap, joinConstraint.getMinRightHand())
-                continue;
-
-            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), leftTableBitmap) &&
-                LongBitmap.isSubset(joinConstraint.getMinRightHand(), leftTableBitmap))
-                continue;
-            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), rightTableBitmap) &&
-                LongBitmap.isSubset(joinConstraint.getMinRightHand(), rightTableBitmap))
-                continue;
-
-            if (joinConstraint.getJoinType().isSemiJoin())
-            {
-                if (LongBitmap.isSubset(joinConstraint.getRightHand(), leftTableBitmap) &&
-                    !LongBitmap.isSubset(joinConstraint.getRightHand(), leftTableBitmap))
-                    continue;
-                if (LongBitmap.isSubset(joinConstraint.getRightHand(), rightTableBitmap) &&
-                    !joinConstraint.getRightHand().equals(rightTableBitmap))
-                    continue;
             }
 
-            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), leftTableBitmap) &&
-                LongBitmap.isSubset(joinConstraint.getMinRightHand(), rightTableBitmap)) {
+            if (LongBitmap.isSubset(joinTableBitmap, joinConstraint.getMinRightHand())) {
+                continue;
+            }
+
+            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), leftTableBitmap)
+                    && LongBitmap.isSubset(joinConstraint.getMinRightHand(), leftTableBitmap)) {
+                continue;
+            }
+
+            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), rightTableBitmap)
+                    && LongBitmap.isSubset(joinConstraint.getMinRightHand(), rightTableBitmap)) {
+                continue;
+            }
+
+            if (joinConstraint.getJoinType().isSemiJoin()) {
+                if (LongBitmap.isSubset(joinConstraint.getRightHand(), leftTableBitmap)
+                        && !LongBitmap.isSubset(joinConstraint.getRightHand(), leftTableBitmap)) {
+                    continue;
+                }
+                if (LongBitmap.isSubset(joinConstraint.getRightHand(), rightTableBitmap)
+                        && !joinConstraint.getRightHand().equals(rightTableBitmap)) {
+                    continue;
+                }
+            }
+
+            if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), leftTableBitmap)
+                    && LongBitmap.isSubset(joinConstraint.getMinRightHand(), rightTableBitmap)) {
                 if (matchedJoinConstraint != null) {
                     return false;
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = false;
-            } else if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), rightTableBitmap) &&
-                LongBitmap.isSubset(joinConstraint.getMinRightHand(), leftTableBitmap)) {
+            } else if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), rightTableBitmap)
+                    && LongBitmap.isSubset(joinConstraint.getMinRightHand(), leftTableBitmap)) {
                 if (matchedJoinConstraint != null) {
                     return false;
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = true;
-            } else if (joinConstraint.getJoinType().isSemiJoin() &&
-                joinConstraint.getRightHand().equals(rightTableBitmap)) {
+            } else if (joinConstraint.getJoinType().isSemiJoin()
+                    && joinConstraint.getRightHand().equals(rightTableBitmap)) {
                 if (matchedJoinConstraint != null) {
                     return false;
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = false;
-            } else if (joinConstraint.getJoinType().isSemiJoin() &&
-                joinConstraint.getRightHand().equals(leftTableBitmap)) {
+            } else if (joinConstraint.getJoinType().isSemiJoin()
+                    && joinConstraint.getRightHand().equals(leftTableBitmap)) {
                 /* Reversed semijoin case */
                 if (matchedJoinConstraint != null) {
                     return false;
@@ -161,28 +170,24 @@ public class LeadingHint extends Hint {
                 matchedJoinConstraint = joinConstraint;
                 reversed = true;
             } else {
-                if (LongBitmap.isOverlap(leftTableBitmap, joinConstraint.getMinRightHand()) &&
-                    LongBitmap.isOverlap(rightTableBitmap, joinConstraint.getMinRightHand())) {
-                    continue;		/* assume valid previous violation of RHS */
+                if (LongBitmap.isOverlap(leftTableBitmap, joinConstraint.getMinRightHand())
+                        && LongBitmap.isOverlap(rightTableBitmap, joinConstraint.getMinRightHand())) {
+                    continue;
                 }
 
-                if (!joinConstraint.getJoinType().isLeftJoin() ||
-                    LongBitmap.isOverlap(joinTableBitmap, joinConstraint.getMinLeftHand())) {
+                if (!joinConstraint.getJoinType().isLeftJoin()
+                        || LongBitmap.isOverlap(joinTableBitmap, joinConstraint.getMinLeftHand())) {
                     return false;
                 }
 
                 mustBeLeftjoin = true;
             }
         }
-
-        if (mustBeLeftjoin && (matchedJoinConstraint == null ||
-                !matchedJoinConstraint.getJoinType().isLeftJoin() ||
-                    !matchedJoinConstraint.isLhsStrict())) {
+        if (mustBeLeftjoin && (matchedJoinConstraint == null || !matchedJoinConstraint.getJoinType().isLeftJoin()
+                || !matchedJoinConstraint.isLhsStrict())) {
             return false;
         }
-
-        /* Otherwise, it's a valid join */
-        *reversed_p = reversed;
-	    return true;
+        assert (reversed == false);
+        return true;
     }
 }

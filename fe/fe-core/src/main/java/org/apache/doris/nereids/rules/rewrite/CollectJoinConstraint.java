@@ -104,16 +104,16 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
         );
     }
 
-    private void collectJoinConstraintList(LeadingHint leading, Long leftHand, Long rightHand, LogicalJoin join
-            , Long filterTableBitMap, Long nonNullableSlotBitMap) {
+    private void collectJoinConstraintList(LeadingHint leading, Long leftHand, Long rightHand, LogicalJoin join,
+                                            Long filterTableBitMap, Long nonNullableSlotBitMap) {
         Long totalTables = LongBitmap.or(leftHand, rightHand);
         if (join.getJoinType().isInnerJoin()) {
             leading.setInnerJoinBitmap(LongBitmap.or(leading.getInnerJoinBitmap(), totalTables));
             return;
         }
         if (join.getJoinType().isFullOuterJoin()) {
-            JoinConstraint newJoinConstraint = new JoinConstraint(leftHand, rightHand, leftHand, rightHand
-                    , JoinType.FULL_OUTER_JOIN, false);
+            JoinConstraint newJoinConstraint = new JoinConstraint(leftHand, rightHand, leftHand, rightHand,
+                    JoinType.FULL_OUTER_JOIN, false);
             leading.getJoinConstraintList().add(newJoinConstraint);
             return;
         }
@@ -122,20 +122,17 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
         Long innerJoinTableBitmap = LongBitmap.and(totalTables, leading.getInnerJoinBitmap());
         Long minRightHand = LongBitmap.newBitmapUnion(filterTableBitMap, rightHand);
         minRightHand = LongBitmap.newBitmapUnion(minRightHand, innerJoinTableBitmap);
-        for (JoinConstraint other: leading.getJoinConstraintList()) {
-            if (other.getJoinType() == JoinType.FULL_OUTER_JOIN)
-            {
-                if (LongBitmap.isOverlap(leftHand, other.getLeftHand()) ||
-                    LongBitmap.isOverlap(leftHand, other.getRightHand()))
-                {
+        for (JoinConstraint other : leading.getJoinConstraintList()) {
+            if (other.getJoinType() == JoinType.FULL_OUTER_JOIN) {
+                if (LongBitmap.isOverlap(leftHand, other.getLeftHand())
+                        || LongBitmap.isOverlap(leftHand, other.getRightHand())) {
                     minLeftHand = LongBitmap.or(minLeftHand,
                         other.getLeftHand());
                     minLeftHand = LongBitmap.or(minLeftHand,
                         other.getRightHand());
                 }
-                if (LongBitmap.isOverlap(rightHand, other.getLeftHand()) ||
-                    LongBitmap.isOverlap(rightHand, other.getRightHand()))
-                {
+                if (LongBitmap.isOverlap(rightHand, other.getLeftHand())
+                        || LongBitmap.isOverlap(rightHand, other.getRightHand())) {
                     minRightHand = LongBitmap.or(minRightHand,
                         other.getLeftHand());
                     minRightHand = LongBitmap.or(minRightHand,
@@ -145,12 +142,10 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
                 continue;
             }
 
-            if (LongBitmap.isOverlap(leftHand, other.getRightHand()))
-            {
-                if (LongBitmap.isOverlap(filterTableBitMap, other.getRightHand()) &&
-                    (join.getJoinType().isSemiOrAntiJoin() ||
-                        !LongBitmap.isOverlap(nonNullableSlotBitMap, other.getMinRightHand())))
-                {
+            if (LongBitmap.isOverlap(leftHand, other.getRightHand())) {
+                if (LongBitmap.isOverlap(filterTableBitMap, other.getRightHand())
+                        && (join.getJoinType().isSemiOrAntiJoin()
+                        || !LongBitmap.isOverlap(nonNullableSlotBitMap, other.getMinRightHand()))) {
                     minLeftHand = LongBitmap.or(minLeftHand,
                         other.getLeftHand());
                     minLeftHand = LongBitmap.or(minLeftHand,
@@ -158,24 +153,20 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
                 }
             }
 
-            if (LongBitmap.isOverlap(rightHand, other.getRightHand()))
-            {
-                if (LongBitmap.isOverlap(filterTableBitMap, other.getRightHand()) ||
-                    !LongBitmap.isOverlap(filterTableBitMap, other.getMinLeftHand()) ||
-                    join.getJoinType().isSemiOrAntiJoin() ||
-                    other.getJoinType().isSemiOrAntiJoin() ||
-                            !other.isLhsStrict())
-                {
-                    minRightHand = LongBitmap.or(minRightHand,
-                        other.getLeftHand());
-                    minRightHand = LongBitmap.or(minRightHand,
-                        other.getRightHand());
+            if (LongBitmap.isOverlap(rightHand, other.getRightHand())) {
+                if (LongBitmap.isOverlap(filterTableBitMap, other.getRightHand())
+                        || !LongBitmap.isOverlap(filterTableBitMap, other.getMinLeftHand())
+                        || join.getJoinType().isSemiOrAntiJoin()
+                        || other.getJoinType().isSemiOrAntiJoin()
+                        || !other.isLhsStrict()) {
+                    minRightHand = LongBitmap.or(minRightHand, other.getLeftHand());
+                    minRightHand = LongBitmap.or(minRightHand, other.getRightHand());
                 }
             }
         }
 
-        JoinConstraint newJoinConstraint = new JoinConstraint(minLeftHand, minRightHand, leftHand, rightHand
-                , join.getJoinType(), isStrict);
+        JoinConstraint newJoinConstraint = new JoinConstraint(minLeftHand, minRightHand, leftHand, rightHand,
+                join.getJoinType(), isStrict);
         leading.getJoinConstraintList().add(newJoinConstraint);
     }
 
