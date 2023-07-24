@@ -33,6 +33,8 @@ public class JoinConstraint {
 
     private final boolean lhsStrict;
 
+    private boolean isReversed;
+
     /**
      * join constraints which means restriction to some logical not equivalence of left join and semi join
      * @param minLeftHand minimal left hand table bitmap which needed for a special join
@@ -74,5 +76,13 @@ public class JoinConstraint {
 
     public boolean isLhsStrict() {
         return lhsStrict;
+    }
+
+    public void setReversed(boolean reversed) {
+        isReversed = reversed;
+    }
+
+    public boolean isReversed() {
+        return isReversed;
     }
 }

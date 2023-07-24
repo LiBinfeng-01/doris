@@ -21,6 +21,7 @@ import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.hint.Hint;
+import org.apache.doris.nereids.hint.JoinConstraint;
 import org.apache.doris.nereids.hint.LeadingHint;
 import org.apache.doris.nereids.jobs.cascades.DeriveStatsJob;
 import org.apache.doris.nereids.jobs.cascades.OptimizeGroupJob;
@@ -97,101 +98,10 @@ public class Optimizer {
         cascadesContext.getJobScheduler().executeJobPool(cascadesContext);
     }
 
-    private Plan generateLeadingJoinPlan(LeadingHint leading) {
-        Stack<Pair<Integer, LogicalPlan>> stack = new Stack<>();
-        int index = 0;
-        LogicalPlan logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index));
-        logicalPlan = makeFilterPlanIfExist(leading.getFilters(), logicalPlan);
-        assert (logicalPlan != null);
-        stack.push(Pair.of(leading.getLevellist().get(index), logicalPlan));
-        int stackTopLevel = leading.getLevellist().get(index++);
-        while (index < leading.getTablelist().size()) {
-            int currentLevel = leading.getLevellist().get(index);
-            if (currentLevel == stackTopLevel) {
-                // should return error if can not found table
-                logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index++));
-                logicalPlan = makeFilterPlanIfExist(leading.getFilters(), logicalPlan);
-                Pair<Integer, LogicalPlan> newStackTop = stack.peek();
-                while (!(stack.isEmpty() || stackTopLevel != newStackTop.first)) {
-                    // check join is legal and get join type
-                    JoinType joinType = JoinType.INNER_JOIN;
-                    newStackTop = stack.pop();
-                    List<Expression> conditions = getJoinConditions(
-                            leading.getFilters(), newStackTop.second, logicalPlan);
-                    // get joinType
-                    LogicalJoin logicalJoin = new LogicalJoin<>(joinType, ExpressionUtils.EMPTY_CONDITION,
-                            conditions,
-                            JoinHint.NONE,
-                            Optional.empty(),
-                            newStackTop.second,
-                            logicalPlan);
-                    if (stackTopLevel > 0) {
-                        stackTopLevel--;
-                    }
-                    if (!stack.isEmpty()) {
-                        newStackTop = stack.peek();
-                    }
-                    logicalPlan = logicalJoin;
-                }
-                stack.push(Pair.of(stackTopLevel, logicalPlan));
-            } else {
-                // push
-                logicalPlan = leading.getTableNameToScanMap().get(leading.getTablelist().get(index++));
-                stack.push(Pair.of(currentLevel, logicalPlan));
-                stackTopLevel = currentLevel;
-            }
-        }
-
-        // we want all filters been remove
-        assert (leading.getFilters().isEmpty());
-        return stack.pop().second;
-    }
-
-    private List<Expression> getJoinConditions(List<Pair<Long, Expression>> filters,
-                                                    LogicalPlan left, LogicalPlan right) {
-        List<Expression> joinConditions = new ArrayList<>();
-        for (int i = filters.size() - 1; i >= 0; i--) {
-            Pair<Long, Expression> filterPair = filters.get(i);
-            Long tablesBitMap = LongBitmap.or(getBitmap(left), getBitmap(right));
-            if (LongBitmap.isSubset(filterPair.first, tablesBitMap)) {
-                joinConditions.add(filterPair.second);
-                filters.remove(i);
-            }
-        }
-        return joinConditions;
-    }
-
-    private LogicalPlan makeFilterPlanIfExist(List<Pair<Long, Expression>> filters, LogicalPlan scan) {
-        Set<Expression> newConjuncts = new HashSet<>();
-        for (int i = filters.size() - 1; i >= 0; i--) {
-            Pair<Long, Expression> filterPair = filters.get(i);
-            if (LongBitmap.isSubset(filterPair.first, getBitmap(scan))) {
-                newConjuncts.add(filterPair.second);
-                filters.remove(i);
-            }
-        }
-        if (newConjuncts.isEmpty()) {
-            return scan;
-        } else {
-            return new LogicalFilter<>(newConjuncts, scan);
-        }
-    }
-
-    private Long getBitmap(LogicalPlan root) {
-        if (root instanceof LogicalJoin) {
-            return ((LogicalJoin) root).getBitmap();
-        } else if (root instanceof LogicalRelation) {
-            return LongBitmap.set(0L, (((LogicalRelation) root).getRelationId().asInt()));
-        } else if (root instanceof LogicalFilter) {
-            return getBitmap((LogicalPlan) root.child(0));
-        } else {
-            return null;
-        }
-    }
-
     // DependsRules: EnsureProjectOnTopJoin.class
     private void leadingOptimize(LeadingHint leading) {
-        Plan leadingPlan = generateLeadingJoinPlan(leading);
+        Plan leadingPlan = leading.generateLeadingJoinPlan();
+        Plan parentOfFirstJoinPlan = getFirstJoinPlanParent(cascadesContext.getRewritePlan());
         cascadesContext.setRewritePlan(leadingPlan);
         getSessionVariable().setDisableJoinReorder(true);
     }

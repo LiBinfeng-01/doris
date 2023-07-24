@@ -304,7 +304,9 @@ public class Rewriter extends AbstractBatchJobExecutor {
             topic("LEADING JOIN",
                 bottomUp(
                     new CollectJoinConstraint()
-                ))
+                ),
+                custom(RuleType.LEADING_JOIN, LeadingJoin::new)
+            )
     );
 
     private static final List<RewriteJob> WHOLE_TREE_REWRITE_JOBS

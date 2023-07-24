@@ -20,13 +20,19 @@ package org.apache.doris.nereids.hint;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.plans.JoinHint;
+import org.apache.doris.nereids.trees.plans.JoinType;
+import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.algebra.Join;
+import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
+import org.apache.doris.nereids.trees.plans.logical.LogicalJoin;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 
 import com.google.common.collect.Maps;
+import org.apache.doris.nereids.trees.plans.logical.LogicalRelation;
+import org.apache.doris.nereids.util.ExpressionUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * select hint.
@@ -98,13 +104,13 @@ public class LeadingHint extends Hint {
     }
 
     /**
-     * check if join is legal, if is not legal, leading hint will failed to generate plan
+     * try to get join constraint, if can not get, it means join is inner join,
      * @param joinTableBitmap table bitmap below this join
      * @param leftTableBitmap table bitmap below right child
      * @param rightTableBitmap table bitmap below right child
      * @return boolean value used for judging whether the join is legal, and should this join need to reverse
      */
-    public boolean joinIsLegal(Long joinTableBitmap, Long leftTableBitmap, Long rightTableBitmap) {
+    public Pair<JoinConstraint, Boolean> getJoinConstraint(Long joinTableBitmap, Long leftTableBitmap, Long rightTableBitmap) {
         boolean reversed = false;
         boolean mustBeLeftjoin = false;
 
@@ -143,21 +149,21 @@ public class LeadingHint extends Hint {
             if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), leftTableBitmap)
                     && LongBitmap.isSubset(joinConstraint.getMinRightHand(), rightTableBitmap)) {
                 if (matchedJoinConstraint != null) {
-                    return false;
+                    return Pair.of(null, false);
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = false;
             } else if (LongBitmap.isSubset(joinConstraint.getMinLeftHand(), rightTableBitmap)
                     && LongBitmap.isSubset(joinConstraint.getMinRightHand(), leftTableBitmap)) {
                 if (matchedJoinConstraint != null) {
-                    return false;
+                    return Pair.of(null, false);
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = true;
             } else if (joinConstraint.getJoinType().isSemiJoin()
                     && joinConstraint.getRightHand().equals(rightTableBitmap)) {
                 if (matchedJoinConstraint != null) {
-                    return false;
+                    return Pair.of(null, false);
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = false;
@@ -165,7 +171,7 @@ public class LeadingHint extends Hint {
                     && joinConstraint.getRightHand().equals(leftTableBitmap)) {
                 /* Reversed semijoin case */
                 if (matchedJoinConstraint != null) {
-                    return false;
+                    return Pair.of(null, false);
                 }
                 matchedJoinConstraint = joinConstraint;
                 reversed = true;
@@ -177,7 +183,7 @@ public class LeadingHint extends Hint {
 
                 if (!joinConstraint.getJoinType().isLeftJoin()
                         || LongBitmap.isOverlap(joinTableBitmap, joinConstraint.getMinLeftHand())) {
-                    return false;
+                    return Pair.of(null, false);
                 }
 
                 mustBeLeftjoin = true;
@@ -185,9 +191,123 @@ public class LeadingHint extends Hint {
         }
         if (mustBeLeftjoin && (matchedJoinConstraint == null || !matchedJoinConstraint.getJoinType().isLeftJoin()
                 || !matchedJoinConstraint.isLhsStrict())) {
-            return false;
+            return Pair.of(null, false);
         }
-        assert (reversed == false);
-        return true;
+        // this means inner join
+        if (matchedJoinConstraint == null) {
+            return Pair.of(null, true);
+        }
+        matchedJoinConstraint.setReversed(reversed);
+        return Pair.of(matchedJoinConstraint, true);
+    }
+
+    public JoinType computeJoinType(Long left, Long right) {
+        Pair<JoinConstraint, Boolean> joinConstraintBooleanPair = getJoinConstraint(LongBitmap.or(left, right), left, right);
+        if (!joinConstraintBooleanPair.second) {
+            assert (1 != 1);
+            //throw exception
+        } else if (joinConstraintBooleanPair.first == null) {
+            return JoinType.INNER_JOIN;
+        } else {
+            JoinConstraint joinConstraint = joinConstraintBooleanPair.first;
+            if (joinConstraint.isReversed()) {
+                return joinConstraint.getJoinType().swap();
+            } else {
+                return joinConstraint.getJoinType();
+            }
+        }
+        return JoinType.INNER_JOIN;
+    }
+
+    public Plan generateLeadingJoinPlan() {
+        Stack<Pair<Integer, LogicalPlan>> stack = new Stack<>();
+        int index = 0;
+        LogicalPlan logicalPlan = getTableNameToScanMap().get(getTablelist().get(index));
+        logicalPlan = makeFilterPlanIfExist(getFilters(), logicalPlan);
+        assert (logicalPlan != null);
+        stack.push(Pair.of(getLevellist().get(index), logicalPlan));
+        int stackTopLevel = getLevellist().get(index++);
+        while (index < getTablelist().size()) {
+            int currentLevel = getLevellist().get(index);
+            if (currentLevel == stackTopLevel) {
+                // should return error if can not found table
+                logicalPlan = getTableNameToScanMap().get(getTablelist().get(index++));
+                logicalPlan = makeFilterPlanIfExist(getFilters(), logicalPlan);
+                Pair<Integer, LogicalPlan> newStackTop = stack.peek();
+                while (!(stack.isEmpty() || stackTopLevel != newStackTop.first)) {
+                    // check join is legal and get join type
+                    newStackTop = stack.pop();
+                    List<Expression> conditions = getJoinConditions(
+                        getFilters(), newStackTop.second, logicalPlan);
+                    JoinType joinType = computeJoinType(getBitmap(newStackTop.second), getBitmap(logicalPlan));
+                    // get joinType
+                    LogicalJoin logicalJoin = new LogicalJoin<>(joinType, ExpressionUtils.EMPTY_CONDITION,
+                        conditions,
+                        JoinHint.NONE,
+                        Optional.empty(),
+                        newStackTop.second,
+                        logicalPlan);
+                    if (stackTopLevel > 0) {
+                        stackTopLevel--;
+                    }
+                    if (!stack.isEmpty()) {
+                        newStackTop = stack.peek();
+                    }
+                    logicalPlan = logicalJoin;
+                }
+                stack.push(Pair.of(stackTopLevel, logicalPlan));
+            } else {
+                // push
+                logicalPlan = getTableNameToScanMap().get(getTablelist().get(index++));
+                stack.push(Pair.of(currentLevel, logicalPlan));
+                stackTopLevel = currentLevel;
+            }
+        }
+
+        // we want all filters been remove
+        assert (getFilters().isEmpty());
+        return stack.pop().second;
+    }
+
+    private List<Expression> getJoinConditions(List<Pair<Long, Expression>> filters,
+                                               LogicalPlan left, LogicalPlan right) {
+        List<Expression> joinConditions = new ArrayList<>();
+        for (int i = filters.size() - 1; i >= 0; i--) {
+            Pair<Long, Expression> filterPair = filters.get(i);
+            Long tablesBitMap = LongBitmap.or(getBitmap(left), getBitmap(right));
+            if (LongBitmap.isSubset(filterPair.first, tablesBitMap)) {
+                joinConditions.add(filterPair.second);
+                filters.remove(i);
+            }
+        }
+        return joinConditions;
+    }
+
+    private LogicalPlan makeFilterPlanIfExist(List<Pair<Long, Expression>> filters, LogicalPlan scan) {
+        Set<Expression> newConjuncts = new HashSet<>();
+        for (int i = filters.size() - 1; i >= 0; i--) {
+            Pair<Long, Expression> filterPair = filters.get(i);
+            if (LongBitmap.isSubset(filterPair.first, getBitmap(scan))) {
+                newConjuncts.add(filterPair.second);
+                filters.remove(i);
+            }
+        }
+        if (newConjuncts.isEmpty()) {
+            return scan;
+        } else {
+            return new LogicalFilter<>(newConjuncts, scan);
+        }
+    }
+
+    private Long getBitmap(LogicalPlan root) {
+        if (root instanceof LogicalJoin) {
+            return ((LogicalJoin) root).getBitmap();
+        } else if (root instanceof LogicalRelation) {
+            return LongBitmap.set(0L, (((LogicalRelation) root).getRelationId().asInt()));
+        } else if (root instanceof LogicalFilter) {
+            return getBitmap((LogicalPlan) root.child(0));
+        } else {
+            return null;
+        }
     }
 }

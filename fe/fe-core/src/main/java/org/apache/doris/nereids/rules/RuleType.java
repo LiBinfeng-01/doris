@@ -245,6 +245,8 @@ public enum RuleType {
     COLLECT_JOIN_CONSTRAINT(RuleTypeClass.REWRITE),
     COLLECT_PROJECT_ABOVE_CONSUMER(RuleTypeClass.REWRITE),
     COLLECT_PROJECT_ABOVE_FILTER_CONSUMER(RuleTypeClass.REWRITE),
+
+    LEADING_JOIN(RuleTypeClass.REWRITE),
     REWRITE_SENTINEL(RuleTypeClass.REWRITE),
 
     // exploration rules
