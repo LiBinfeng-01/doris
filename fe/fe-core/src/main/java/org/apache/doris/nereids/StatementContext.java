@@ -20,6 +20,7 @@ package org.apache.doris.nereids;
 import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.common.IdGenerator;
 import org.apache.doris.common.Pair;
+import org.apache.doris.nereids.hint.Hint;
 import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.rules.analysis.ColumnAliasGenerator;
 import org.apache.doris.nereids.trees.expressions.CTEId;
@@ -78,6 +79,7 @@ public class StatementContext {
     // Used to update consumer's stats
     private final Map<CTEId, List<Pair<Map<Slot, Slot>, Group>>> cteIdToConsumerGroup = new HashMap<>();
     private final Map<CTEId, LogicalPlan> rewrittenCtePlan = new HashMap<>();
+    private final Map<String, Hint> hintMap = Maps.newLinkedHashMap();
 
     public StatementContext() {
         this.connectContext = ConnectContext.get();
@@ -168,6 +170,10 @@ public class StatementContext {
             supplier = cacheSupplier;
         }
         return supplier.get();
+    }
+
+    public Map<String, Hint> getHintMap() {
+        return hintMap;
     }
 
     public ColumnAliasGenerator getColumnAliasGenerator() {
