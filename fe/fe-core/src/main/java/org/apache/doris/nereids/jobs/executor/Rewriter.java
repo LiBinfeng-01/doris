@@ -65,6 +65,7 @@ import org.apache.doris.nereids.rules.rewrite.InferFilterNotNull;
 import org.apache.doris.nereids.rules.rewrite.InferJoinNotNull;
 import org.apache.doris.nereids.rules.rewrite.InferPredicates;
 import org.apache.doris.nereids.rules.rewrite.InferSetOperatorDistinct;
+import org.apache.doris.nereids.rules.rewrite.LeadingJoin;
 import org.apache.doris.nereids.rules.rewrite.MergeFilters;
 import org.apache.doris.nereids.rules.rewrite.MergeOneRowRelationIntoUnion;
 import org.apache.doris.nereids.rules.rewrite.MergeProjects;
@@ -302,6 +303,7 @@ public class Rewriter extends AbstractBatchJobExecutor {
                     )
             ),
             topic("LEADING JOIN",
+                custom(RuleType.CHECK_LEADING, CheckLeading::new),
                 bottomUp(
                     new CollectJoinConstraint()
                 ),

@@ -17,40 +17,19 @@
 
 package org.apache.doris.nereids.jobs.executor;
 
-import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext;
-import org.apache.doris.nereids.StatementContext;
-import org.apache.doris.nereids.hint.Hint;
-import org.apache.doris.nereids.hint.JoinConstraint;
-import org.apache.doris.nereids.hint.LeadingHint;
 import org.apache.doris.nereids.jobs.cascades.DeriveStatsJob;
 import org.apache.doris.nereids.jobs.cascades.OptimizeGroupJob;
 import org.apache.doris.nereids.jobs.joinorder.JoinOrderJob;
-import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
-import org.apache.doris.nereids.trees.expressions.Expression;
-import org.apache.doris.nereids.trees.plans.JoinHint;
-import org.apache.doris.nereids.trees.plans.JoinType;
-import org.apache.doris.nereids.trees.plans.Plan;
-import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
-import org.apache.doris.nereids.trees.plans.logical.LogicalJoin;
-import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
-import org.apache.doris.nereids.trees.plans.logical.LogicalRelation;
-import org.apache.doris.nereids.util.ExpressionUtils;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.Stack;
 
 /**
  * Cascades style optimize:
@@ -69,11 +48,6 @@ public class Optimizer {
      * execute optimize, use dphyp or cascades according to join number and session variables.
      */
     public void execute() {
-        // if we use leading, logical plan should be replaced before init to memo and join reorder should be forbidden
-        Hint leadingHint = cascadesContext.getStatementContext().getHintMap().get("Leading");
-        if (leadingHint != null) {
-            leadingOptimize((LeadingHint) leadingHint);
-        }
         // init memo
         cascadesContext.toMemo();
         // stats derive
@@ -96,14 +70,6 @@ public class Optimizer {
         cascadesContext.pushJob(
                 new OptimizeGroupJob(cascadesContext.getMemo().getRoot(), cascadesContext.getCurrentJobContext()));
         cascadesContext.getJobScheduler().executeJobPool(cascadesContext);
-    }
-
-    // DependsRules: EnsureProjectOnTopJoin.class
-    private void leadingOptimize(LeadingHint leading) {
-        Plan leadingPlan = leading.generateLeadingJoinPlan();
-        Plan parentOfFirstJoinPlan = getFirstJoinPlanParent(cascadesContext.getRewritePlan());
-        cascadesContext.setRewritePlan(leadingPlan);
-        getSessionVariable().setDisableJoinReorder(true);
     }
 
     private void dpHypOptimize() {

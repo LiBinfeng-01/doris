@@ -39,12 +39,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -307,6 +309,13 @@ public class LogicalOlapScan extends LogicalCatalogRelation implements OlapScan 
                     return slot;
                 })
                 .collect(ImmutableList.toImmutableList());
+    }
+
+    @Override
+    public Set<RelationId> getInputRelations() {
+        Set<RelationId> relationIdSet = Sets.newHashSet();
+        relationIdSet.add(relationId);
+        return relationIdSet;
     }
 
     /**

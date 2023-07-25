@@ -23,16 +23,23 @@ import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.plans.JoinHint;
 import org.apache.doris.nereids.trees.plans.JoinType;
 import org.apache.doris.nereids.trees.plans.Plan;
-import org.apache.doris.nereids.trees.plans.algebra.Join;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
 import org.apache.doris.nereids.trees.plans.logical.LogicalJoin;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
-
-import com.google.common.collect.Maps;
 import org.apache.doris.nereids.trees.plans.logical.LogicalRelation;
 import org.apache.doris.nereids.util.ExpressionUtils;
 
-import java.util.*;
+import com.google.common.collect.Maps;
+import org.apache.doris.nereids.util.JoinUtils;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.Stack;
 
 /**
  * select hint.
@@ -110,7 +117,8 @@ public class LeadingHint extends Hint {
      * @param rightTableBitmap table bitmap below right child
      * @return boolean value used for judging whether the join is legal, and should this join need to reverse
      */
-    public Pair<JoinConstraint, Boolean> getJoinConstraint(Long joinTableBitmap, Long leftTableBitmap, Long rightTableBitmap) {
+    public Pair<JoinConstraint, Boolean> getJoinConstraint(Long joinTableBitmap, Long leftTableBitmap,
+                                                           Long rightTableBitmap) {
         boolean reversed = false;
         boolean mustBeLeftjoin = false;
 
@@ -201,8 +209,15 @@ public class LeadingHint extends Hint {
         return Pair.of(matchedJoinConstraint, true);
     }
 
+    /**
+     * Try to get join type of two random logical scan or join node table bitmap
+     * @param left left side table bitmap
+     * @param right right side table bitmap
+     * @return join type or failure
+     */
     public JoinType computeJoinType(Long left, Long right) {
-        Pair<JoinConstraint, Boolean> joinConstraintBooleanPair = getJoinConstraint(LongBitmap.or(left, right), left, right);
+        Pair<JoinConstraint, Boolean> joinConstraintBooleanPair
+                = getJoinConstraint(LongBitmap.or(left, right), left, right);
         if (!joinConstraintBooleanPair.second) {
             assert (1 != 1);
             //throw exception
@@ -219,6 +234,10 @@ public class LeadingHint extends Hint {
         return JoinType.INNER_JOIN;
     }
 
+    /**
+     * using leading to generate plan, it could be failed, if failed set leading status to unused or syntax error
+     * @return plan
+     */
     public Plan generateLeadingJoinPlan() {
         Stack<Pair<Integer, LogicalPlan>> stack = new Stack<>();
         int index = 0;
@@ -238,15 +257,17 @@ public class LeadingHint extends Hint {
                     // check join is legal and get join type
                     newStackTop = stack.pop();
                     List<Expression> conditions = getJoinConditions(
-                        getFilters(), newStackTop.second, logicalPlan);
+                            getFilters(), newStackTop.second, logicalPlan);
+                    Pair<List<Expression>, List<Expression>> pair = JoinUtils.extractExpressionForHashTable(
+                        newStackTop.second.getOutput(), logicalPlan.getOutput(), conditions);
                     JoinType joinType = computeJoinType(getBitmap(newStackTop.second), getBitmap(logicalPlan));
                     // get joinType
-                    LogicalJoin logicalJoin = new LogicalJoin<>(joinType, ExpressionUtils.EMPTY_CONDITION,
-                        conditions,
-                        JoinHint.NONE,
-                        Optional.empty(),
-                        newStackTop.second,
-                        logicalPlan);
+                    LogicalJoin logicalJoin = new LogicalJoin<>(joinType, pair.first,
+                            pair.second,
+                            JoinHint.NONE,
+                            Optional.empty(),
+                            newStackTop.second,
+                            logicalPlan);
                     if (stackTopLevel > 0) {
                         stackTopLevel--;
                     }
@@ -309,5 +330,26 @@ public class LeadingHint extends Hint {
         } else {
             return null;
         }
+    }
+
+    /**
+     * get leading containing tables which means leading wants to combine tables into joins
+     * @return long value represent tables we included
+     */
+    public Long getLeadingTableBitmap() {
+        Long totalBitmap = 0L;
+        for (int index = 0; index < getTablelist().size(); index++) {
+            LogicalPlan logicalPlan = getTableNameToScanMap().get(getTablelist().get(index));
+            totalBitmap = LongBitmap.set(totalBitmap, (((LogicalRelation) logicalPlan).getRelationId().asInt()));
+        }
+        return totalBitmap;
+    }
+
+    public Long computeTableBitmap(Set<RelationId> relationIdSet) {
+        Long totalBitmap = 0L;
+        for (RelationId id : relationIdSet) {
+            totalBitmap = LongBitmap.set(totalBitmap, (id.asInt()));
+        }
+        return totalBitmap;
     }
 }

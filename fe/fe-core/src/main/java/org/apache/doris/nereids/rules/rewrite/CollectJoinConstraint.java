@@ -50,6 +50,8 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
                         .getStatementContext().getHintMap().get("Leading");
                 if (leading == null) {
                     return ctx.root;
+                } else if (leading.isSyntaxError()) {
+                    return ctx.root;
                 }
                 return ctx.root;
             }).toRule(RuleType.COLLECT_JOIN_CONSTRAINT),
@@ -79,8 +81,8 @@ public class CollectJoinConstraint implements RewriteRuleFactory {
                     totalFilterBitMap = LongBitmap.or(totalFilterBitMap, filterBitMap);
                     leading.getFilters().add(Pair.of(filterBitMap, expression));
                 }
-                Long leftHand = calSlotsTableBitMap(leading, join.left().getInputSlots(), false);
-                Long rightHand = calSlotsTableBitMap(leading, join.right().getInputSlots(), false);
+                Long leftHand = leading.computeTableBitmap(join.left().getInputRelations());
+                Long rightHand = leading.computeTableBitmap(join.right().getInputRelations());
                 join.setBitmap(LongBitmap.or(leftHand, rightHand));
                 collectJoinConstraintList(leading, leftHand, rightHand, join, totalFilterBitMap, nonNullableSlotBitMap);
 

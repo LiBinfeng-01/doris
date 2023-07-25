@@ -49,8 +49,20 @@ public class Hint {
         this.hintName = hintName;
     }
 
+    public void setStatus(HintStatus status) {
+        this.status = status;
+    }
+
     public HintStatus getStatus() {
         return status;
+    }
+
+    public boolean isSuccess() {
+        return getStatus() == HintStatus.SUCCESS;
+    }
+
+    public boolean isSyntaxError() {
+        return getStatus() == HintStatus.SYNTAX_ERROR;
     }
 
     public String getHintName() {
