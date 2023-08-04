@@ -316,8 +316,8 @@ public class Rewriter extends AbstractBatchJobExecutor {
             ),
 
             topic("eliminate empty relation",
-                bottomUp(new EliminateEmptyRelation()),
-            
+                bottomUp(new EliminateEmptyRelation())
+            ),
             topic("LEADING JOIN",
                 bottomUp(
                     new CollectJoinConstraint()
