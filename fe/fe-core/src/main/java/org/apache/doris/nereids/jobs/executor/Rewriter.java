@@ -220,6 +220,15 @@ public class Rewriter extends AbstractBatchJobExecutor {
                     bottomUp(new EliminateNotNull()),
                     topDown(new ConvertInnerOrCrossJoin())
             ),
+            topic("LEADING JOIN",
+                bottomUp(
+                    new CollectJoinConstraint()
+                ),
+                custom(RuleType.LEADING_JOIN, LeadingJoin::new),
+                bottomUp(
+                    new ExpressionRewrite(CheckLegalityAfterRewrite.INSTANCE)
+                )
+            ),
             topic("Column pruning and infer predicate",
                     custom(RuleType.COLUMN_PRUNING, ColumnPruning::new),
                     custom(RuleType.INFER_PREDICATES, InferPredicates::new),
@@ -317,15 +326,6 @@ public class Rewriter extends AbstractBatchJobExecutor {
 
             topic("eliminate empty relation",
                 bottomUp(new EliminateEmptyRelation())
-            ),
-            topic("LEADING JOIN",
-                bottomUp(
-                    new CollectJoinConstraint()
-                ),
-                custom(RuleType.LEADING_JOIN, LeadingJoin::new),
-                bottomUp(
-                    new ExpressionRewrite(CheckLegalityAfterRewrite.INSTANCE)
-                )
             )
     );
 
