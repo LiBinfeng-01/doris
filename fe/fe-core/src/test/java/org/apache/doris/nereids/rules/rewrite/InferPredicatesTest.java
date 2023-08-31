@@ -17,9 +17,14 @@
 
 package org.apache.doris.nereids.rules.rewrite;
 
+import org.apache.doris.nereids.trees.expressions.Add;
+import org.apache.doris.nereids.trees.expressions.Cast;
+import org.apache.doris.nereids.trees.expressions.EqualTo;
+import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.plans.JoinType;
-import org.apache.doris.nereids.util.MemoPatternMatchSupported;
-import org.apache.doris.nereids.util.PlanChecker;
+import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.util.*;
 import org.apache.doris.utframe.TestWithFeService;
 
 import org.junit.jupiter.api.Test;
@@ -627,5 +632,21 @@ public class InferPredicatesTest extends TestWithFeService implements MemoPatter
                                 any()
                         ).when(join -> join.getJoinType() == JoinType.LEFT_OUTER_JOIN)
                 );
+    }
+
+    private final LogicalOlapScan scan1 = PlanConstructor.newLogicalOlapScan(0, "t1", 0);
+
+    @Test
+    void testInfer() {
+        LogicalPlan plan = new LogicalPlanBuilder(scan1)
+            .filter(new EqualTo(new Cast(scan1.getOutput().get(0), scan1.getOutput().get(1)), Literal.of(1)))
+            .build();
+
+        PlanChecker.from(MemoTestUtils.createConnectContext(), plan)
+            .applyTopDown(new InferFilterNotNull())
+            .matches(
+                // LogicalFilter ( predicates=((((id#0 + name#1) = 1) AND ( not id IS NULL)) AND ( not name IS NULL)) )
+                logicalFilter().when(filter -> filter.getConjuncts().size() == 3)
+            );
     }
 }
