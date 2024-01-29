@@ -115,6 +115,10 @@ public class JoinExchangeLeftProject extends OneExplorationRuleFactory {
      * check reorder masks.
      */
     public static boolean checkReorder(LogicalJoin<? extends Plan, ? extends Plan> topJoin) {
+        if (topJoin.getJoinReorderContext().isLeadingJoin()
+                || ((LogicalJoin) topJoin.left().child(0)).getJoinReorderContext().isLeadingJoin()) {
+            return false;
+        }
         if (topJoin.getJoinReorderContext().hasCommute()
                 || topJoin.getJoinReorderContext().hasLeftAssociate()
                 || topJoin.getJoinReorderContext().hasRightAssociate()
