@@ -118,6 +118,8 @@ public class CascadesContext implements ScheduleContext {
     private final List<MaterializationContext> materializationContexts;
     private boolean isLeadingJoin = false;
 
+    private boolean isLeadingDisableJoinReorder = false;
+
     private final Map<String, Hint> hintMap = Maps.newLinkedHashMap();
 
     /**
@@ -634,6 +636,14 @@ public class CascadesContext implements ScheduleContext {
 
     public void setLeadingJoin(boolean leadingJoin) {
         isLeadingJoin = leadingJoin;
+    }
+
+    public boolean isLeadingDisableJoinReorder() {
+        return isLeadingDisableJoinReorder;
+    }
+
+    public void setLeadingDisableJoinReorder(boolean leadingDisableJoinReorder) {
+        isLeadingDisableJoinReorder = leadingDisableJoinReorder;
     }
 
     public Map<String, Hint> getHintMap() {
