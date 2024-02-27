@@ -53,6 +53,10 @@ public interface Aggregate<CHILD_TYPE extends Plan> extends UnaryPlan<CHILD_TYPE
         return ExpressionUtils.collect(getOutputExpressions(), AggregateFunction.class::isInstance);
     }
 
+    default Set<AggregateFunction> getAggregateFunctionsConst() {
+        return ExpressionUtils.collect(getOutputExpressions(), AggregateFunction.class::isInstance);
+    }
+
     default Set<Expression> getDistinctArguments() {
         return getAggregateFunctions().stream()
                 .filter(AggregateFunction::isDistinct)
