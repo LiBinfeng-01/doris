@@ -68,6 +68,7 @@ suite("test_distribute") {
     streamLoad {
         table "t4"
         db "test_distribute"
+        set 'column_separator', '|'
         set 'format', 'csv'
         file 't4.csv'
         time 10000
