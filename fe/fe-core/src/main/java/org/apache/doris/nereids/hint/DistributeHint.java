@@ -71,6 +71,6 @@ public class DistributeHint extends Hint {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        return this.distributeType == ((DistributeHint) o).distributeType;
+        return true;
     }
 }
