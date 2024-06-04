@@ -224,6 +224,7 @@ import org.apache.doris.nereids.properties.OrderKey;
 import org.apache.doris.nereids.properties.SelectHint;
 import org.apache.doris.nereids.properties.SelectHintLeading;
 import org.apache.doris.nereids.properties.SelectHintOrdered;
+import org.apache.doris.nereids.properties.SelectHintRule;
 import org.apache.doris.nereids.properties.SelectHintSetVar;
 import org.apache.doris.nereids.trees.TableSample;
 import org.apache.doris.nereids.trees.expressions.Add;
@@ -3114,6 +3115,14 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
                     break;
                 case "ordered":
                     hints.put(hintName, new SelectHintOrdered(hintName));
+                    break;
+                case "rule":
+                    List<String> ruleParameters = new ArrayList<String>();
+                    for (HintAssignmentContext kv : hintStatement.parameters) {
+                        String parameterName = visitIdentifierOrText(kv.key);
+                        ruleParameters.add(parameterName);
+                    }
+                    hints.put(hintName, new SelectHintRule(hintName, ruleParameters));
                     break;
                 default:
                     break;
