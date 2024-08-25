@@ -129,6 +129,7 @@ supportedDmlStatement
         TO filePath=STRING_LITERAL
         (propertyClause)?
         (withRemoteStorageSystem)?                                     #export
+    | replayCommand filePath=STRING_LITERAL                                   #replay
     ;
 
 supportedCreateStatement
@@ -612,6 +613,9 @@ planType
     | DISTRIBUTED
     | ALL // default type
     ;
+
+replayCommand
+    : REPLAY DUMP;
 
 mergeType
     : APPEND
@@ -1621,6 +1625,7 @@ nonReserved
     | REPEATABLE
     | REPLACE
     | REPLACE_IF_NOT_NULL
+    | REPLAY
     | REPOSITORIES
     | REPOSITORY
     | RESOURCE
