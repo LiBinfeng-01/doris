@@ -35,7 +35,7 @@ suite("query92") {
          set enable_nereids_timeout = false;
          set enable_runtime_filter_prune=false;
          set runtime_filter_type=8;
-         set dump_nereids_memo=false;
+         set enable_stats=false;
          set disable_nereids_rules='PRUNE_EMPTY_PARTITION';
          """
     qt_ds_shape_92 '''

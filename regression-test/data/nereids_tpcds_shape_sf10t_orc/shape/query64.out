@@ -13,13 +13,13 @@ PhysicalCteAnchor ( cteId=CTEId#1 )
 --------------------PhysicalProject
 ----------------------hashJoin[INNER_JOIN broadcast] hashCondition=((hd1.hd_income_band_sk = ib1.ib_income_band_sk)) otherCondition=() build RFs:RF17 ib_income_band_sk->[hd_income_band_sk]
 ------------------------PhysicalProject
---------------------------hashJoin[INNER_JOIN broadcast] hashCondition=((customer.c_current_hdemo_sk = hd2.hd_demo_sk)) otherCondition=() build RFs:RF16 hd_demo_sk->[c_current_hdemo_sk]
+--------------------------hashJoin[INNER_JOIN shuffle] hashCondition=((customer.c_current_addr_sk = ad2.ca_address_sk)) otherCondition=() build RFs:RF16 ca_address_sk->[c_current_addr_sk]
 ----------------------------PhysicalProject
-------------------------------hashJoin[INNER_JOIN broadcast] hashCondition=((store_sales.ss_hdemo_sk = hd1.hd_demo_sk)) otherCondition=() build RFs:RF15 hd_demo_sk->[ss_hdemo_sk]
+------------------------------hashJoin[INNER_JOIN shuffle] hashCondition=((store_sales.ss_addr_sk = ad1.ca_address_sk)) otherCondition=() build RFs:RF15 ca_address_sk->[ss_addr_sk]
 --------------------------------PhysicalProject
-----------------------------------hashJoin[INNER_JOIN shuffle] hashCondition=((customer.c_current_addr_sk = ad2.ca_address_sk)) otherCondition=() build RFs:RF14 ca_address_sk->[c_current_addr_sk]
+----------------------------------hashJoin[INNER_JOIN broadcast] hashCondition=((customer.c_current_hdemo_sk = hd2.hd_demo_sk)) otherCondition=() build RFs:RF14 hd_demo_sk->[c_current_hdemo_sk]
 ------------------------------------PhysicalProject
---------------------------------------hashJoin[INNER_JOIN shuffle] hashCondition=((store_sales.ss_addr_sk = ad1.ca_address_sk)) otherCondition=() build RFs:RF13 ca_address_sk->[ss_addr_sk]
+--------------------------------------hashJoin[INNER_JOIN broadcast] hashCondition=((store_sales.ss_hdemo_sk = hd1.hd_demo_sk)) otherCondition=() build RFs:RF13 hd_demo_sk->[ss_hdemo_sk]
 ----------------------------------------PhysicalProject
 ------------------------------------------hashJoin[INNER_JOIN broadcast] hashCondition=((store_sales.ss_promo_sk = promotion.p_promo_sk)) otherCondition=() build RFs:RF12 p_promo_sk->[ss_promo_sk]
 --------------------------------------------PhysicalProject
@@ -73,13 +73,13 @@ PhysicalCteAnchor ( cteId=CTEId#1 )
 --------------------------------------------PhysicalProject
 ----------------------------------------------PhysicalOlapScan[promotion]
 ----------------------------------------PhysicalProject
-------------------------------------------PhysicalOlapScan[customer_address]
+------------------------------------------PhysicalOlapScan[household_demographics] apply RFs: RF17
 ------------------------------------PhysicalProject
---------------------------------------PhysicalOlapScan[customer_address]
+--------------------------------------PhysicalOlapScan[household_demographics] apply RFs: RF18
 --------------------------------PhysicalProject
-----------------------------------PhysicalOlapScan[household_demographics] apply RFs: RF17
+----------------------------------PhysicalOlapScan[customer_address]
 ----------------------------PhysicalProject
-------------------------------PhysicalOlapScan[household_demographics] apply RFs: RF18
+------------------------------PhysicalOlapScan[customer_address]
 ------------------------PhysicalProject
 --------------------------PhysicalOlapScan[income_band]
 --------------------PhysicalProject
