@@ -374,9 +374,10 @@ class FoldConstantTest extends ExpressionRewriteTestHelper {
         Exp exp = new Exp(new DoubleLiteral(1d));
         rewritten = executor.rewrite(exp, context);
         Assertions.assertTrue(new DoubleLiteral(Math.E).compareTo((Literal) rewritten) == 0);
-        exp = new Exp(new DoubleLiteral(1000d));
-        rewritten = executor.rewrite(exp, context);
-        Assertions.assertTrue(new DoubleLiteral(Double.POSITIVE_INFINITY).compareTo((Literal) rewritten) == 0);
+        Assertions.assertThrows(AnalysisException.class, () -> {
+            Exp exExp = new Exp(new DoubleLiteral(1000d));
+            Expression exRewritten = executor.rewrite(exExp, context);
+        });
 
         Ln ln = new Ln(new DoubleLiteral(1d));
         rewritten = executor.rewrite(ln, context);
